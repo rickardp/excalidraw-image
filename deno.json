@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window", "dom"]
+  },
+  "lint": {
+    "include": ["src/core"]
+  },
+  "fmt": {
+    "include": ["src/core"]
+  },
+  "tasks": {
+    "dev": "deno run --allow-read src/core/dev.mjs"
+  }
+}

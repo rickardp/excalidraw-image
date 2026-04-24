@@ -1,0 +1,23 @@
+{
+  "name": "excalidraw-image",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Convert Excalidraw files to SVG/PNG from a single native binary.",
+  "license": "MIT",
+  "author": "Rickard",
+  "scripts": {
+    "lint": "deno lint",
+    "test": "vitest run",
+    "build": "node src/scripts/build-core.mjs"
+  },
+  "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
+    "esbuild": "0.28.0",
+    "fontkit": "2.0.4",
+    "linkedom": "0.18.12"
+  },
+  "devDependencies": {
+    "vitest": "4.1.5"
+  }
+}

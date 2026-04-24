@@ -1,0 +1,19 @@
+# Build outputs
+dist/
+target/
+
+# Dependency directories
+node_modules/
+
+# Environment files
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
