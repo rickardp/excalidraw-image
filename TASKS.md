@@ -59,7 +59,7 @@ the task, and hand off.
 - `tests/fixtures/` contains at least `basic-shapes.excalidraw` (can be hand-crafted — one rectangle + one arrow).
 
 ### P-004 — Makefile targets
-**Status:** `todo` **Deps:** P-001, P-003
+**Status:** `done` **Deps:** P-001, P-003
 **Files:** `Makefile`
 **Acceptance:**
 - Targets: `bootstrap`, `core`, `fonts`, `dev`, `rust`, `parity`, `test`, `clean`.
