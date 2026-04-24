@@ -209,7 +209,7 @@ the task, and hand off.
 - Exit 0 on success, 1 on error; error message goes to stderr.
 
 ### J-010 — `src/scripts/build-core.mjs` — esbuild build
-**Status:** `todo` **Deps:** J-008
+**Status:** `done` **Deps:** J-008
 **Ref:** `PLAN.md` §5.7
 **Acceptance:**
 - Bundles `src/core/index.mjs` → `dist/core.mjs` with `--format=esm --platform=neutral --bundle --minify --tree-shaking=true --legal-comments=none --metafile=dist/meta.json`.
@@ -217,8 +217,33 @@ the task, and hand off.
 - Defines: `process.env.NODE_ENV='"production"'`, `import.meta.env.DEV='false'`, `import.meta.env.PROD='true'`, `import.meta.env.PKG_NAME`, `import.meta.env.PKG_VERSION`.
 - Produces `dist/core.mjs` + `dist/meta.json` without error.
 
+**Notes (completion):**
+- Expanded alias list per PHASE0.md Finding A: adds `react/jsx-runtime`,
+  `react/jsx-dev-runtime`, `jotai-scope`, `@excalidraw/mermaid-to-excalidraw`,
+  plus a plugin for the `@radix-ui/*` wildcard and a plugin that routes
+  Excalidraw's dynamic `./locales/*.js` imports to the stub. Target stub is
+  the new `src/core/stubs/proxy.mjs` (callable-Proxy pattern), not the
+  original `empty.mjs` — a plain `{}` breaks `Object.assign` and
+  destructuring downstream. Added `drop: ["console", "debugger"]` per
+  PLAN §5.7 step 3 and `import.meta.url` define per PHASE0.md Finding D.
+- Bundle is 20,722,902 B (19.8 MB). Over the task's 10 MB target because
+  `src/core/shims/fetch-fonts.mjs` imports `src/core/font-assets.mjs`
+  (17.5 MB of base64 WOFF2). That matches PHASE0.md §4's v1 projection
+  ("Embedded fonts (base64 in JS) +12–17 MB raw"); the 10 MB figure in
+  J-010 predates that line item. Total binary still projects to ~50 MB.
+- Zero real forbidden-path inputs in `dist/meta.json`.
+- Smoke test (`import dist/core.mjs; __render(basic-shapes.excalidraw)`)
+  fails under Deno with `TypeError: Cannot read properties of undefined
+  (reading 'origin')` because the bundle reads `window.location.origin` at
+  module-eval time and `src/core/shims/dom.mjs` does not set
+  `window.location` (the F-001 `spike/shims.mjs` did — `globalThis.location`
+  line 31). Pre-setting `globalThis.location = { href: "http://localhost/",
+  origin: "http://localhost" }` before importing the bundle produces the
+  expected `<svg height="140" width="420.08096678629516" viewB…`. Shim gap;
+  task scope forbids editing shims, flagging for a follow-up on J-001.
+
 ### J-011 — `src/scripts/metafile-audit.mjs` — CI gate for forbidden imports
-**Status:** `blocked` **Deps:** J-010
+**Status:** `todo` **Deps:** J-010
 **Ref:** `PLAN.md` §5.7 step 4
 **Acceptance:**
 - Reads `dist/meta.json`, fails (exit 1) if any input path matches: `**/components/App.tsx`, `**/components/LayerUI.tsx`, `**/actions/**`, `**/hooks/**`, `**/i18n.ts`, `**/locales/**`, `**/css/**`.

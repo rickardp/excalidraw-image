@@ -25,12 +25,8 @@ help:
 bootstrap:
 	npm ci && cargo fetch && deno cache src/core/dev.mjs
 
-# J-010 will add src/scripts/build-core.mjs. Until then we echo a placeholder
-# and exit 0 so downstream targets (e.g. `make test`) stay green.
 core:
-	@test -f src/scripts/build-core.mjs \
-		&& node src/scripts/build-core.mjs \
-		|| echo "not-yet-implemented (J-010)"
+	node src/scripts/build-core.mjs
 
 # FNT-001 will add src/scripts/build-font-assets.mjs. Same guard pattern as core.
 fonts:
