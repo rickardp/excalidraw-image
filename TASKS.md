@@ -255,7 +255,7 @@ the task, and hand off.
 ## FNT — Phase 3: Fonts (critical path; see PLAN §4A)
 
 ### FNT-001 — `src/scripts/build-font-assets.mjs`
-**Status:** `blocked` **Deps:** P-001
+**Status:** `done` **Deps:** P-001
 **Ref:** `PLAN.md` §4A.3, §4A.7
 **Acceptance:**
 - Reads `node_modules/@excalidraw/excalidraw/dist/prod/fonts/` recursively for `*.woff2`.
@@ -265,7 +265,7 @@ the task, and hand off.
 - Running `make fonts` twice on unchanged input produces no diff.
 
 ### FNT-002 — `src/core/font-assets.mjs` committed initial version
-**Status:** `blocked` **Deps:** FNT-001
+**Status:** `done` **Deps:** FNT-001
 **Acceptance:**
 - Generated once, committed. Counts match `node_modules/.../fonts/` byte-for-byte (234 WOFF2s as of Excalidraw 0.18.0).
 
