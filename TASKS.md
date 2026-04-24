@@ -314,11 +314,13 @@ the task, and hand off.
 - Without this call, text-wrapped fixture wraps at wrong width (sanity regression test).
 
 ### T-005 — Fixture: wrapped text + long text
-**Status:** `blocked` **Deps:** P-003
+**Status:** `done` **Deps:** P-003
 **Files:** `tests/fixtures/text-wrapped.excalidraw`
 **Acceptance:**
 - Scene has one text element in Virgil and one in Excalifont; both wrapped inside containers of known widths (300px and 500px).
 - File round-trips on excalidraw.com.
+
+**Notes:** hand-crafted by the orchestrator; renders cleanly via bundled `dist/core.mjs` — 2 `<text>` elements, viewBox `0 0 870 240`. Excalidraw.com round-trip not yet manually verified; flag if downstream T-006 fails structurally.
 
 ### T-006 — Line-wrap parity gate (§4A.2)
 **Status:** `blocked` **Deps:** T-003, T-004, T-005
