@@ -182,7 +182,7 @@ the task, and hand off.
 - Unit test: `typeof Worker === "undefined"` after importing.
 
 ### J-007 — `src/core/shims/install.mjs`
-**Status:** `blocked` **Deps:** J-001..J-006
+**Status:** `done` **Deps:** J-001..J-006
 **Ref:** `PLAN.md` §4.2 (updated install order), `PHASE0.md` Findings B+C
 **Acceptance:**
 - Imports in order: `dom` (sets devicePixelRatio + linkedom window/document), `web-globals` (URL, TextEncoder, Event, etc. — renamed from base64), `fonts` (FontFace + document.fonts), `fetch-fonts` (requires FNT-002 done), `canvas` (createElement wrapper), `workers` (Worker=undefined).
@@ -191,7 +191,7 @@ the task, and hand off.
 - Unit test: after install, each shim's signature globals are present (`document`, `URL`, `FontFace`, `fetch`, `HTMLCanvasElement`, `typeof Worker === "undefined"`).
 
 ### J-008 — `src/core/index.mjs` — `__render` entry
-**Status:** `blocked` **Deps:** J-007
+**Status:** `todo` **Deps:** J-007
 **Ref:** `PLAN.md` §4.1
 **Acceptance:**
 - Imports `shims/install.mjs` first, then `exportToSvg` from `@excalidraw/excalidraw`.
