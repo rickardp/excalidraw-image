@@ -398,7 +398,7 @@ the task, and hand off.
 - Generated once, committed. Counts match `node_modules/.../fonts/` byte-for-byte (234 WOFF2s as of Excalidraw 0.18.0).
 
 ### FNT-003 — Inventory integrity test (§4A.8 gate 1)
-**Status:** `blocked` **Deps:** FNT-002
+**Status:** `done` **Deps:** FNT-002
 **Files:** `tests/js/font-inventory.test.mjs`
 **Acceptance:**
 - Walks the installed npm font dir, hashes each file, compares to `font-assets.mjs`.
