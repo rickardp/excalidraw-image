@@ -1,2 +1,8 @@
-// Placeholder — scaffolding only (P-003).
-// Real crate source is added by R-001 and following tasks (PLAN.md §5).
+// R-001 — `excalidraw-image` library crate.
+//
+// Exposes the `argv` and `engine` modules so `main.rs` and integration
+// tests can link against them. There is no additional façade API; this
+// crate is primarily a CLI, and the library surface exists for testability.
+
+pub mod argv;
+pub mod engine;

@@ -683,7 +683,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 ## R — Phase 6: Rust shell
 
 ### R-001 — `crates/excalidraw-image/Cargo.toml`
-**Status:** `todo` **Deps:** P-001, F-002
+**Status:** `done` **Deps:** P-001, F-002
 **Ref:** `PLAN.md` §5.1, §5.6
 **Acceptance:**
 - Dependencies: `deno_core` (pinned version from F-003), `tokio` (`rt`, `macros`), `serde`, `serde_json`, `serde_v8`, `anyhow`, `clap` (or `lexopt` — pick in §5.2).
@@ -691,7 +691,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Crate metadata: `name = "excalidraw-image"`, description, license MIT, repository, keywords.
 
 ### R-002 — `src/argv.rs` — argv parser
-**Status:** `blocked` **Deps:** R-001
+**Status:** `done` **Deps:** R-001
 **Ref:** `PLAN.md` §5.4
 **Acceptance:**
 - Flags implemented: `-o/--output`, `--format`, `--embed-scene`, `--no-background`, `--dark`, `--padding`, `--scale`, `--frame`, `--max`, `--skip-font-inline`, `--strict-fonts`, `-h/--help`, `-v/--version`.
@@ -699,7 +699,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Unit tests cover: stdin input (`-`), stdout output (`-`), `--format` inference from extension, conflicting flags error out.
 
 ### R-003 — `src/engine.rs` — `deno_core` wrapper
-**Status:** `blocked` **Deps:** R-001
+**Status:** `done` **Deps:** R-001
 **Ref:** `PLAN.md` §5.2
 **Acceptance:**
 - `Engine::new()` creates a `JsRuntime` with `NoopModuleLoader` and loads `include_str!(concat!(env!("OUT_DIR"), "/core.mjs"))`.
@@ -707,7 +707,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Integration test loads the bundled `core.mjs`, renders `basic-shapes.excalidraw`, asserts output starts with `<svg`.
 
 ### R-004 — `src/main.rs`
-**Status:** `blocked` **Deps:** R-002, R-003
+**Status:** `todo` **Deps:** R-002, R-003
 **Ref:** `PLAN.md` §5.3
 **Acceptance:**
 - Reads input from file or stdin; writes output to file or stdout.
@@ -715,7 +715,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Exits 0 on success, 1 on parse/render error (with message to stderr), 2 on argv errors.
 
 ### R-005 — `build.rs` — copy `dist/core.mjs` + fonts into `OUT_DIR`
-**Status:** `blocked` **Deps:** J-010, FNT-002, R-001
+**Status:** `done` **Deps:** J-010, FNT-002, R-001
 **Ref:** `PLAN.md` §5.9
 **Acceptance:**
 - `build.rs` copies `../../dist/core.mjs` to `OUT_DIR/core.mjs`.
