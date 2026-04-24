@@ -573,7 +573,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
   that non-text-element label measurement also routes through our provider.
 
 ### I-004 — Images + frames smoke tests
-**Status:** `blocked` **Deps:** J-012, I-001, I-002, I-003
+**Status:** `done` **Deps:** J-012, I-001, I-002, I-003
 **Acceptance:**
 - CLI output for each fixture is valid SVG.
 - Output contains `<image href="data:image/...">` with non-empty `href`.
