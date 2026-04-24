@@ -92,7 +92,7 @@ the task, and hand off.
 - One shim surprise: `devicePixelRatio` is read at module-eval time by the renderer chunk; must be set on `globalThis` (and `window`) before `exportToSvg` import. Add to J-001.
 
 ### F-002 — Spike: embed `core.mjs` in `deno_core`
-**Status:** `blocked` **Deps:** F-001
+**Status:** `done` **Deps:** F-001
 **Ref:** `PLAN.md` §3.2
 **Files:** `spike-rust/` (temporary)
 **Acceptance:**
@@ -102,8 +102,18 @@ the task, and hand off.
 - Release binary stripped+LTO: note size in task notes. Target < 60 MB.
 - Note cold-start time from `time cargo run --release -- fixture` in task notes.
 
+**Notes (completion):**
+- Hypothesis holds. See `spike-rust/README.md` for the full report.
+- **deno_core version pinned: `0.399.0`** (latest stable on crates.io as of 2026-04-24). PLAN §3.2's `"0.318"` is stale — API has moved: `handle_scope` is now the `deno_core::scope!` macro, `resolve_value` is deprecated in favor of `resolve` + `with_event_loop_promise`. `serde_v8` is re-exported from `deno_core`.
+- Release binary: **43.6 MB** (45,744,528 B). Budget 60 MB. Pass.
+- Cold start: **80 ms** median of 5 runs on `basic-shapes.excalidraw` (Apple Silicon). Budget 400 ms. Pass.
+- Parity: **byte-identical** to Deno output (SHA-256 `21d5511f...3e26866`).
+- **Key finding — bundle is not actually host-neutral.** `deno_core`'s default runtime provides almost nothing beyond `console`, `queueMicrotask`, `globalThis`. Deno ships `atob`, `btoa`, `DOMException`, `URL`, `URLSearchParams`, `TextEncoder`/`TextDecoder`, `Event`, `EventTarget`, `performance`, `setTimeout`, `fetch`, `crypto`, `AbortController`, etc. The F-001 bundle tacitly depends on several of these. Spike adds them in `spike-rust/src/polyfills.js`; R-001 should move equivalents into `src/core/shims/install.mjs` (preferred) or adopt the `deno_webidl`/`deno_url`/`deno_web`/`deno_console` extensions from the Deno stack.
+- **Key finding — `load_main_es_module_from_code` swallowed synchronous throws.** The ES-module evaluation path in 0.399 returned Ok from `mod_evaluate` even when the module threw during top-level eval. Switched to classic-script `execute_script` and rewrote the 5 `import.meta.url`/`import.meta.env` references in the bundle to literals. J-010 should add these as esbuild `define` entries so the bundle is evaluable without post-processing.
+- J-001 shim ordering needs to include WHATWG polyfills before DOM shims. Update P-002 ESLint rule to also forbid direct reads of `atob`/`btoa`/`DOMException`/`URL`/etc. outside `src/core/shims/**`.
+
 ### F-003 — Phase 0 decision one-pager
-**Status:** `blocked` **Deps:** F-001, F-002
+**Status:** `todo` **Deps:** F-001, F-002
 **Files:** `PHASE0.md` (delete at end of v1, or fold into README)
 **Acceptance:** Documents decisions on package-root-vs-source, the deno_core version pin, Phase 0 size/perf numbers, and any shim surprises discovered. One page.
 
@@ -405,7 +415,7 @@ the task, and hand off.
 ## R — Phase 6: Rust shell
 
 ### R-001 — `crates/excalidraw-image/Cargo.toml`
-**Status:** `blocked` **Deps:** P-001, F-002
+**Status:** `todo` **Deps:** P-001, F-002
 **Ref:** `PLAN.md` §5.1, §5.6
 **Acceptance:**
 - Dependencies: `deno_core` (pinned version from F-003), `tokio` (`rt`, `macros`), `serde`, `serde_json`, `serde_v8`, `anyhow`, `clap` (or `lexopt` — pick in §5.2).
