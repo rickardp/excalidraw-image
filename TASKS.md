@@ -191,7 +191,7 @@ the task, and hand off.
 - Unit test: after install, each shim's signature globals are present (`document`, `URL`, `FontFace`, `fetch`, `HTMLCanvasElement`, `typeof Worker === "undefined"`).
 
 ### J-008 — `src/core/index.mjs` — `__render` entry
-**Status:** `todo` **Deps:** J-007
+**Status:** `done` **Deps:** J-007
 **Ref:** `PLAN.md` §4.1
 **Acceptance:**
 - Imports `shims/install.mjs` first, then `exportToSvg` from `@excalidraw/excalidraw`.
@@ -201,7 +201,7 @@ the task, and hand off.
 - Unit test: call `__render` on the `basic-shapes.excalidraw` fixture; result has `.svg` starting with `<svg`.
 
 ### J-009 — `src/core/dev.mjs` — Deno dev entry
-**Status:** `blocked` **Deps:** J-008
+**Status:** `todo` **Deps:** J-008
 **Ref:** `PLAN.md` §4.1.1
 **Acceptance:**
 - Works only under Deno (guards and exits otherwise).
@@ -209,7 +209,7 @@ the task, and hand off.
 - Exit 0 on success, 1 on error; error message goes to stderr.
 
 ### J-010 — `src/scripts/build-core.mjs` — esbuild build
-**Status:** `blocked` **Deps:** J-008
+**Status:** `todo` **Deps:** J-008
 **Ref:** `PLAN.md` §5.7
 **Acceptance:**
 - Bundles `src/core/index.mjs` → `dist/core.mjs` with `--format=esm --platform=neutral --bundle --minify --tree-shaking=true --legal-comments=none --metafile=dist/meta.json`.
