@@ -44,7 +44,7 @@ the task, and hand off.
 - `make bootstrap` runs `npm ci && cargo fetch && deno cache src/core/dev.mjs` (file need not exist yet).
 
 ### P-002 — eslint config for `src/core/` host-neutrality
-**Status:** `todo` **Deps:** P-001
+**Status:** `done` **Deps:** P-001
 **Files:** `.eslintrc.cjs` or equivalent
 **Acceptance:**
 - `no-restricted-globals` forbids `Bun`, `Deno`, `process`, `Buffer`, `require`, `__dirname`, `__filename` in `src/core/**` except `src/core/dev.mjs`.
