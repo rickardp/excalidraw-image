@@ -611,7 +611,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
   round-trip.
 
 ### E-002 — linkedom metadata serialization test
-**Status:** `todo` **Deps:** E-001
+**Status:** `done` **Deps:** E-001
 **Files:** `tests/js/metadata-serialization.test.mjs`
 **Ref:** `PLAN.md` §11 risk 6
 **Acceptance:**
