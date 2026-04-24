@@ -150,7 +150,7 @@ the task, and hand off.
 **Agent notes:** Start from `spike-rust/src/polyfills.js` (the minimum set F-002 proved necessary). Expand to the full list. Also update `PLAN.md` §7 repo-layout to rename the shim file.
 
 ### J-003 — `src/core/shims/fonts.mjs`
-**Status:** `todo` **Deps:** J-001
+**Status:** `done` **Deps:** J-001
 **Ref:** `PLAN.md` §4.2, §4A.6
 **Acceptance:**
 - `globalThis.FontFace` stores `family`, `style`, `weight`, `display`, `unicodeRange` verbatim; `load()` returns `Promise.resolve(this)`.
