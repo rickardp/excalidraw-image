@@ -201,7 +201,7 @@ the task, and hand off.
 - Unit test: call `__render` on the `basic-shapes.excalidraw` fixture; result has `.svg` starting with `<svg`.
 
 ### J-009 — `src/core/dev.mjs` — Deno dev entry
-**Status:** `todo` **Deps:** J-008
+**Status:** `done` **Deps:** J-008
 **Ref:** `PLAN.md` §4.1.1
 **Acceptance:**
 - Works only under Deno (guards and exits otherwise).
@@ -226,7 +226,7 @@ the task, and hand off.
 - Hooked into `make test`.
 
 ### J-012 — Smoke test: basic shapes under Deno
-**Status:** `blocked` **Deps:** J-009
+**Status:** `blocked` **Deps:** J-009, J-010
 **Files:** `tests/deno/render.test.mjs`, `tests/fixtures/basic-shapes.excalidraw`
 **Acceptance:**
 - Vitest-style (or Deno test) asserts output starts with `<svg`, contains a `<rect>` and a `<path>` (arrow), and is well-formed XML.
