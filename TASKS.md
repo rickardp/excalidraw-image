@@ -73,9 +73,9 @@ the task, and hand off.
 ## F — Phase 0: Feasibility spike
 
 ### F-001 — Spike: bundle `@excalidraw/excalidraw` in Deno
-**Status:** `todo` **Deps:** P-001, P-003
+**Status:** `done` **Deps:** P-001, P-003
 **Ref:** `PLAN.md` §3.1
-**Files:** `spike/` (temporary; delete when done)
+**Files:** `spike/` (kept in repo; F-002 depends on the generated `spike/core.mjs`)
 **Acceptance:**
 - A throwaway `spike/entry.mjs` imports `exportToSvg` from the package root.
 - Shims cover at minimum: linkedom DOM, canvas `measureText` stub, `FontFace` stub, `fetch` that 404s harmlessly.
@@ -83,6 +83,13 @@ the task, and hand off.
 - `deno run --allow-read spike/dev.mjs fixtures/basic-shapes.excalidraw` prints an `<svg>` that opens in excalidraw.com.
 - `meta.json` contains **no** `**/components/App.tsx`, `**/actions/**`, `**/hooks/**`, `**/locales/**`, `**/css/**` entries.
 - If any forbidden path appears, document in task notes whether esbuild aliases + `.css` empty loader suffice (`PLAN.md` §5.7 step 2).
+
+**Notes (completion):**
+- Hypothesis holds. See `spike/README.md` for the full report.
+- Bundle size: 4.13 MB unminified, 3.18 MB minified.
+- Zero real forbidden paths in `meta.json`. Locales show as `stub-virtual:./locales/*` (plugin-replaced, not real source); J-011 audit script must skip `stub-virtual:` inputs.
+- `PLAN.md` §5.7 step 2 aliases (`react`, `react-dom`, `jotai`, `.css:empty`) are **necessary but not sufficient**. Real J-010 needs additionally: `@excalidraw/mermaid-to-excalidraw`, the entire `@radix-ui/*` family, `jotai-scope`, `react/jsx-runtime`, `react/jsx-dev-runtime`, and the `locales/*.js` dynamic-import pattern. Stub module must be a callable `Proxy` (plain `{}` breaks `const { x } = createIsolation()` destructuring). `platform=neutral` requires explicit `mainFields: ["browser","module","main"]` + `conditions: ["module","import","browser","default"]`. See `spike/build.mjs`.
+- One shim surprise: `devicePixelRatio` is read at module-eval time by the renderer chunk; must be set on `globalThis` (and `window`) before `exportToSvg` import. Add to J-001.
 
 ### F-002 — Spike: embed `core.mjs` in `deno_core`
 **Status:** `blocked` **Deps:** F-001

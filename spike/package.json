@@ -1,0 +1,7 @@
+{
+  "name": "excalidraw-image-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Feasibility spike for F-001: bundle @excalidraw/excalidraw under Deno."
+}
