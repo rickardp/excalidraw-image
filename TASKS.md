@@ -251,11 +251,31 @@ the task, and hand off.
 - Hooked into `make test`.
 
 ### J-012 — Smoke test: basic shapes under Deno
-**Status:** `blocked` **Deps:** J-009, J-010
-**Files:** `tests/deno/render.test.mjs`, `tests/fixtures/basic-shapes.excalidraw`
+**Status:** `done` **Deps:** J-009, J-010
+**Files:** `tests/deno/render.test.mjs`, `tests/js/bundle-smoke.test.mjs`, `tests/fixtures/basic-shapes.excalidraw`, `Makefile`
 **Acceptance:**
 - Vitest-style (or Deno test) asserts output starts with `<svg`, contains a `<rect>` and a `<path>` (arrow), and is well-formed XML.
 - Runs via `deno test --allow-read tests/deno/`.
+
+**Notes (completion):**
+- Deno test imports `dist/core.mjs` directly (not `src/core/index.mjs`), so
+  it validates the esbuild alias + stub chain that J-010 produces. Raw-Deno
+  import of `src/core/index.mjs` still fails with the J-009 `roughjs/bin/rough`
+  specifier error; that's a Deno resolver quirk against raw source, orthogonal
+  to the bundled-pipeline smoke gate.
+- Assertions: `<svg` present, `<rect` present, `<path` present, no literal
+  `undefined` in output. 1 test, ~190 ms under `deno test` (Deno 2.5.6,
+  Apple Silicon). First run also downloads `jsr:@std/assert` 1.0.19.
+- Complementary `tests/js/bundle-smoke.test.mjs` (vitest) is an
+  existence/size gate: fails if `dist/core.mjs` is missing or <10 MB. Its
+  only purpose is to catch forgotten `make core` runs before `npm test`.
+  It does NOT exercise the runtime — the bundle is `--platform=neutral`
+  with Deno-host assumptions (`location`, `fetch`, etc.) and running it
+  under plain Node is not supported.
+- Makefile: added `deno-test` target (depends on `core`), added to `test`
+  prerequisites alongside `audit`. `make test` now runs
+  core → audit → deno-test → vitest → cargo test → parity.
+- Smoke output head: `<svg height="140" width="420.08096678629516" viewBox="0 0 420.08096678629516 140`.
 
 ---
 
