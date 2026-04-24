@@ -406,7 +406,7 @@ the task, and hand off.
 - Included in `make test`.
 
 ### FNT-004 — Subset round-trip test per family (§4A.8 gate 2)
-**Status:** `blocked` **Deps:** FNT-002
+**Status:** `done` **Deps:** FNT-002
 **Files:** `tests/js/font-subset.test.mjs`
 **Ref:** `PLAN.md` §4A.3
 **Acceptance:**
@@ -414,7 +414,7 @@ the task, and hand off.
 - Xiaolai uses CJK codepoints instead of ABC.
 
 ### FNT-005 — Browser fidelity test (§4A.8 gate 3)
-**Status:** `blocked` **Deps:** T-006, FNT-004
+**Status:** `todo` **Deps:** T-006, FNT-004
 **Files:** `tests/js/browser-fidelity.test.mjs`
 **Ref:** `PLAN.md` §4A.8 gate 3
 **Acceptance:**
