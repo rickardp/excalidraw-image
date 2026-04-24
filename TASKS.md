@@ -529,11 +529,37 @@ fixture's `<text>` preserves
 README note deferred to D-001 (the README itself doesn't exist yet).
 
 ### FNT-011 — `.excalidraw.svg` font metadata round-trip (§4A.8 gate 6)
-**Status:** `todo` **Deps:** E-001
+**Status:** `done` **Deps:** E-001
 **Files:** `tests/js/font-roundtrip.test.mjs`
 **Acceptance:**
 - Export a scene with `--embed-scene`; decode the base64 payload back.
 - Assert every text element's `fontFamily` (numeric) and the family fallback string in SVG `font-family` match the input exactly.
+
+**Notes (completion):**
+- Imports `decodePayload(svg)` from E-003's
+  `tests/js/embed-scene-roundtrip.test.mjs` rather than inlining a copy —
+  the two gates share one decoder (pako-inflate of the compressed bstring
+  wrapper). That import causes E-003's own describe block to re-run as a
+  side effect under this file, which is harmless and keeps the decoder
+  exercised.
+- For each of 3 fixtures (`basic-shapes`, `text-wrapped`, `mixed-script`):
+  (a) filter non-deleted `type:"text"` elements from the scene, (b) render
+  with `embedScene: true`, (c) decode payload, (d) match decoded text
+  elements back to originals by `id` and assert `fontFamily` equality,
+  (e) scan the rendered SVG for `<text font-family="…">` attributes and
+  assert each first-family name is one of the expected names derived from
+  `ID_TO_FIRST_FAMILY` (1=Virgil, 2=Helvetica, 3=Cascadia, 5=Excalifont,
+  6=Nunito, 7=Lilita One, 8=Comic Shanns, 9=Liberation Sans), and every
+  expected name appears at least once.
+- Observed: `basic-shapes` has no text → both sides empty (degenerate but
+  exercises the payload path). `text-wrapped`: ids `text-virgil` (ff=1) +
+  `text-excali` (ff=5); SVG `font-family` values
+  `"Virgil, Segoe UI Emoji"` and `"Excalifont, Xiaolai, Segoe UI Emoji"`.
+  `mixed-script`: id `text-mixed` (ff=5); SVG `font-family`
+  `"Excalifont, Xiaolai, Segoe UI Emoji"`. FNT-008 preservation confirmed
+  transitively — Helvetica fallback string would surface as
+  `"Helvetica, sans-serif, Segoe UI Emoji"`, already covered by the
+  Helvetica-specific test (`font-helvetica-alias.test.mjs`).
 
 ---
 
