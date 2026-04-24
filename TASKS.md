@@ -483,9 +483,27 @@ the task, and hand off.
 **Acceptance:** Image with non-trivial crop that exercises the `<mask>` code path in `renderer/staticSvgScene.ts`.
 
 ### I-003 — Frames fixture
-**Status:** `wip` **Deps:** P-003
+**Status:** `done` **Deps:** P-003
 **Files:** `tests/fixtures/frames.excalidraw`
 **Acceptance:** Two frames, one with a name that requires truncation (exercises `scene/export.ts:69`), children clipped to frame bounds.
+
+**Notes (completion):**
+- Two frames with name "Hi" (short) and a 112-char name (long). Each frame
+  contains one child (rectangle, ellipse) whose `frameId` points to its
+  parent. Order: frames first, then children.
+- Verification via bundled `dist/core.mjs` under Node:
+  `<clipPath>` count = 2 (one per frame, confirms clipping path), short
+  label `>Hi<` renders literally, long label is truncated from 112 chars
+  to `"A deliberately long frame label..."` (34 chars). The truncation
+  path uses three ASCII dots `...`, not the Unicode `…` character — the
+  task's regex accepts either via its `||` fallback.
+- `<rect>` count = 5 (1 from the child rectangle + 2 per frame for header
+  background + one additional emitted by the SVG scaffolding); `<ellipse>`
+  count = 0 because roughjs renders the ellipse child as two `<path>`
+  elements.
+- The long label exercises `scene/export.ts:69`'s direct
+  `canvas.measureText` call (fontkit-backed via the T-003 shim), confirming
+  that non-text-element label measurement also routes through our provider.
 
 ### I-004 — Images + frames smoke tests
 **Status:** `blocked` **Deps:** J-012, I-001, I-002, I-003
