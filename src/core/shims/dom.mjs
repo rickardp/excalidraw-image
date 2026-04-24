@@ -39,4 +39,24 @@ export function installDomShim() {
   if (globalThis.devicePixelRatio === undefined) {
     globalThis.devicePixelRatio = 1;
   }
+
+  // J-010 finding: the bundled Excalidraw reads `window.location.origin`
+  // at module-eval time. linkedom's window has no `location` by default.
+  // Install a minimal placeholder on both globalThis and window.
+  if (globalThis.location === undefined) {
+    const location = {
+      href: "http://localhost/",
+      origin: "http://localhost",
+      protocol: "http:",
+      host: "localhost",
+      hostname: "localhost",
+      port: "",
+      pathname: "/",
+      search: "",
+      hash: "",
+      toString() { return this.href; },
+    };
+    assign("location", location);
+    try { window.location = location; } catch { /* read-only on some linkedom versions */ }
+  }
 }

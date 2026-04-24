@@ -30,6 +30,13 @@ describe("installDomShim", () => {
       expect(globalThis.devicePixelRatio).toBe(1);
     });
 
+    it("installs window.location (J-010 finding)", () => {
+      expect(globalThis.location).toBeDefined();
+      expect(globalThis.location.origin).toBe("http://localhost");
+      expect(globalThis.location.href).toBe("http://localhost/");
+      expect(String(globalThis.location)).toBe("http://localhost/");
+    });
+
     it("builds an SVG tree with correct namespace handling", () => {
       const svgNS = "http://www.w3.org/2000/svg";
       const svg = globalThis.document.createElementNS(svgNS, "svg");
