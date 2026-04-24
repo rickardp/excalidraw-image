@@ -279,6 +279,64 @@ const PRE_CORE_BOOTSTRAP: &str = r#"
   // --- Worker / MessageChannel --------------------------------------------
   g.Worker = undefined;
   g.MessageChannel = undefined;
+
+  // --- crypto.getRandomValues (deterministic) -----------------------------
+  // R-007 discovery: the frames.excalidraw fixture reaches a nanoid-style
+  // ID generator (`Ba=(A=21)=>crypto.getRandomValues(new Uint8Array(A))…`)
+  // inside Excalidraw's export path. Deno provides `crypto` natively;
+  // `deno_core`'s default runtime does NOT, so Rust throws `ReferenceError:
+  // crypto is not defined` while Deno happily renders.
+  //
+  // Importantly, the generated IDs do NOT end up in the emitted SVG for
+  // any of our fixtures (verified empirically — Deno's real-random crypto
+  // still produced byte-identical output across runs). So the polyfill
+  // only needs to satisfy the call signature, not produce realistic
+  // entropy. We seed with a fixed constant so that IF a future fixture
+  // DOES put these bytes into the SVG, the parity gate gates on a
+  // deterministic value rather than noise.
+  //
+  // Host parity note: Deno still uses REAL crypto bytes and yields
+  // different `Ba()` returns than this polyfill does. That's safe today
+  // because no fixture emits those bytes. If R-007 ever flags a fixture
+  // where randomness leaks into the output, the fix is to polyfill this
+  // on the Deno side as well (pre-importing a shim in deno-run.mjs), not
+  // to widen tolerances.
+  if (typeof g.crypto !== "object" || typeof g.crypto.getRandomValues !== "function") {
+    let __prng_state = 0x12345678 >>> 0;
+    const __prng = () => {
+      // xorshift32 — tiny, deterministic, good-enough distribution. We
+      // discard the upper bits to fit in a byte.
+      __prng_state ^= __prng_state << 13; __prng_state >>>= 0;
+      __prng_state ^= __prng_state >>> 17; __prng_state >>>= 0;
+      __prng_state ^= __prng_state << 5;  __prng_state >>>= 0;
+      return __prng_state & 0xff;
+    };
+    const cryptoShim = {
+      getRandomValues(arr) {
+        const a = arr instanceof Uint8Array
+          ? arr
+          : new Uint8Array(arr.buffer || arr);
+        for (let i = 0; i < a.length; i++) a[i] = __prng();
+        return arr;
+      },
+      randomUUID() {
+        // RFC 4122 v4-ish; bytes are deterministic but formatted correctly.
+        const b = new Uint8Array(16);
+        this.getRandomValues(b);
+        b[6] = (b[6] & 0x0f) | 0x40;
+        b[8] = (b[8] & 0x3f) | 0x80;
+        const h = (n) => n.toString(16).padStart(2, "0");
+        return (
+          h(b[0]) + h(b[1]) + h(b[2]) + h(b[3]) + "-" +
+          h(b[4]) + h(b[5]) + "-" +
+          h(b[6]) + h(b[7]) + "-" +
+          h(b[8]) + h(b[9]) + "-" +
+          h(b[10]) + h(b[11]) + h(b[12]) + h(b[13]) + h(b[14]) + h(b[15])
+        );
+      },
+    };
+    g.crypto = cryptoShim;
+  }
 })();
 "#;
 

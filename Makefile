@@ -45,9 +45,13 @@ dev:
 rust:
 	cargo build --release -p excalidraw-image
 
-# R-007 implements the real Deno-vs-Rust byte-diff gate. Placeholder until then.
-parity:
-	@echo "not-yet-implemented (R-007)"
+# R-007: Deno-vs-Rust byte-identity gate (PLAN §8.2). The real gate lives in
+# `crates/excalidraw-image/tests/parity.rs`; it spawns `deno run
+# tests/rust/deno-run.mjs <fixture>` and the release binary per fixture and
+# compares stdout byte-for-byte. Depends on `core` because both hosts load
+# `dist/core.mjs`.
+parity: core
+	cargo test -p excalidraw-image --release --test parity
 
 # J-011: CI gate against forbidden imports in dist/core.mjs. Requires a
 # fresh dist/meta.json, so build core first.

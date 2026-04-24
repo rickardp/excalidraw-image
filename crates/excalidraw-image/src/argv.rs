@@ -17,6 +17,28 @@ use std::ffi::OsString;
 use anyhow::{anyhow, bail, Context, Result};
 use lexopt::prelude::*;
 
+/// Parse-phase error. Today this is a newtype around `anyhow::Error` with a
+/// single variant, but the enum shape is kept so main.rs can branch on the
+/// exit code (2) without string-matching — and so future work can add a
+/// `Help` / `Version` variant if we ever need argv to hand control back to
+/// main instead of exiting inline.
+#[derive(Debug)]
+pub enum ArgvError {
+    /// Any argv problem: unknown flag, missing value, bad number, non-UTF-8
+    /// input. R-008 maps this to exit code 2.
+    Parse(anyhow::Error),
+}
+
+impl std::fmt::Display for ArgvError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArgvError::Parse(e) => write!(f, "{e:#}"),
+        }
+    }
+}
+
+impl std::error::Error for ArgvError {}
+
 /// Output image format. Chosen explicitly via `--format` or inferred from
 /// the output path's extension. `Png` is wired in Phase 7 (resvg);
 /// Phase 6's main.rs rejects Png with a clear error until PNG-001 lands.
@@ -137,9 +159,13 @@ FONTS:
 /// inside this function.
 ///
 /// On argv error (unknown flag, missing value, invalid number), returns
-/// an `anyhow::Error`. Callers should map that to exit code 2 per PLAN §5
-/// (R-008 formalizes this).
-pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Args> {
+/// `ArgvError::Parse`. Callers should map that to exit code 2 per
+/// PLAN §5 (R-008 formalizes this).
+pub fn parse(args: impl IntoIterator<Item = OsString>) -> std::result::Result<Args, ArgvError> {
+    parse_inner(args).map_err(ArgvError::Parse)
+}
+
+fn parse_inner(args: impl IntoIterator<Item = OsString>) -> Result<Args> {
     let mut parser = lexopt::Parser::from_args(args);
     let mut out = Args::default();
     let mut input: Option<String> = None;
@@ -289,7 +315,7 @@ impl Args {
 mod tests {
     use super::*;
 
-    fn parse_strs(args: &[&str]) -> Result<Args> {
+    fn parse_strs(args: &[&str]) -> std::result::Result<Args, ArgvError> {
         let v: Vec<OsString> = args.iter().map(|s| OsString::from(*s)).collect();
         parse(v)
     }

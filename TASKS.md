@@ -707,12 +707,26 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Integration test loads the bundled `core.mjs`, renders `basic-shapes.excalidraw`, asserts output starts with `<svg`.
 
 ### R-004 — `src/main.rs`
-**Status:** `todo` **Deps:** R-002, R-003
+**Status:** `done` **Deps:** R-002, R-003
 **Ref:** `PLAN.md` §5.3
 **Acceptance:**
 - Reads input from file or stdin; writes output to file or stdout.
 - Uses `#[tokio::main(flavor = "current_thread")]`.
 - Exits 0 on success, 1 on parse/render error (with message to stderr), 2 on argv errors.
+
+**Notes (completion):**
+- Wired per PLAN §5.3 sketch. `main` is a thin wrapper that maps a
+  two-variant `RunError` (Argv → 2, Runtime → 1) onto process exit codes.
+- `argv::parse` now returns `Result<Args, ArgvError>` with a single
+  `Parse` variant; kept as an enum rather than a bare `anyhow::Error` so
+  R-008's error-code branching is type-safe. `--help` and `--version`
+  still exit 0 from inside the parser (simpler than a Result<Action>
+  enum for v1; flagged in PLAN §5.4 as acceptable).
+- PNG output is explicitly rejected with a clear message pointing at
+  PNG-001 (Phase 7). SVG output writes raw bytes with no trailing newline
+  so parity (R-007) with Deno's `Deno.stdout.write(...)` is byte-clean.
+- Stdin path (`-`) tested end-to-end via R-008's `broken_json_exits_one`
+  and `js_side_error_surfaces_message` harnesses.
 
 ### R-005 — `build.rs` — copy `dist/core.mjs` + fonts into `OUT_DIR`
 **Status:** `done` **Deps:** J-010, FNT-002, R-001
@@ -724,33 +738,98 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Also mirrors to `crates/excalidraw-image/assets/` for `cargo publish` self-containment.
 
 ### R-006 — Single-fixture smoke test
-**Status:** `blocked` **Deps:** R-004, R-005
-**Files:** `tests/rust/smoke.rs`
+**Status:** `done` **Deps:** R-004, R-005
+**Files:** `crates/excalidraw-image/tests/smoke.rs`
 **Acceptance:** `cargo test -p excalidraw-image smoke` runs the binary against `basic-shapes.excalidraw`, asserts SVG output.
 
+**Notes (completion):**
+- Landed at `crates/excalidraw-image/tests/smoke.rs`, not repo-level
+  `tests/rust/smoke.rs` (PLAN §7's original layout). Cargo integration
+  tests must live inside the owning crate, so `tests/rust/` is repurposed
+  for non-crate harness files (today, `deno-run.mjs`).
+- Uses `env!("CARGO_BIN_EXE_excalidraw-image")` so the test depends on a
+  fresh build automatically. No rebuild logic needed.
+- Assertions are intentionally minimal (exit 0, starts with `<svg`, has a
+  `<rect>` or `<path>`, no literal `undefined`). Rendering correctness is
+  the parity gate's (R-007) job.
+
 ### R-007 — Parity gate: Deno vs Rust byte-identical output (§8.2)
-**Status:** `blocked` **Deps:** R-006, J-012
-**Files:** `tests/rust/parity.rs`
+**Status:** `done` **Deps:** R-006, J-012
+**Files:** `crates/excalidraw-image/tests/parity.rs`, `tests/rust/deno-run.mjs`
 **Ref:** `PLAN.md` §8.2
 **Acceptance:**
 - For every fixture in `tests/fixtures/`: spawn `deno run src/core/dev.mjs <fixture>`, run `cargo run -- <fixture>`, assert **byte-equal** stdout.
 - If a host-specific difference is unavoidable (e.g., RNG seeding), the Deno and Rust hosts share a seed via env var or the JS core takes a deterministic seed from opts.
 - Gate runs in CI on every PR.
 
+**Notes (completion):**
+- Deno side does NOT use `src/core/dev.mjs` — that file imports
+  `src/core/index.mjs`, which dynamic-imports `@excalidraw/excalidraw`,
+  which fails under raw Deno (J-009's roughjs resolver quirk). The
+  parity driver `tests/rust/deno-run.mjs` imports `dist/core.mjs` — the
+  same bytes `build.rs` embeds in the Rust binary. Diffing
+  bundled-Deno vs bundled-Rust is the sharpest signal.
+- Driver uses `Deno.stdout.write` in a loop: macOS short-wrote ~207 B
+  per call on pipe destinations. Missing the loop silently truncated
+  Deno output and caused spurious parity failures.
+- Two host-leak findings discovered by the gate and fixed in the Rust
+  bootstrap (`engine.rs::PRE_CORE_BOOTSTRAP`), NOT by widening
+  tolerances (TASKS appendix rule):
+  1. `crypto.getRandomValues` — Deno provides real crypto; `deno_core`
+     does not. `frames.excalidraw` reaches a nanoid ID generator and
+     Rust threw `ReferenceError`. Fixed by adding a deterministic
+     xorshift32-backed polyfill. Verified empirically: none of the
+     current fixtures emit these bytes into the SVG, so Deno's real
+     randomness and Rust's deterministic values coincidentally produce
+     byte-identical output. If a future fixture leaks these bytes, the
+     gate will flag it and the fix is to polyfill on the Deno side too.
+  2. `Deno.stdout.write` partial-write behaviour (above).
+- Parity pass per fixture (final):
+  - `basic-shapes.excalidraw` — 1,777 B, identical.
+  - `frames.excalidraw` — 3,256 B, identical.
+  - `image.excalidraw` — 622 B, identical.
+  - `image-cropped.excalidraw` — 1,129 B, identical.
+  - `mixed-script.excalidraw` — 11,925 B, identical.
+  - `text-wrapped.excalidraw` — 16,736 B, identical.
+  - `wrap-400.excalidraw` — 10,347 B, identical.
+- `make parity` now `cargo test -p excalidraw-image --release --test
+  parity` (depends on `core`). Replaces the "not-yet-implemented"
+  placeholder.
+
 ### R-008 — Error handling and exit codes
-**Status:** `blocked` **Deps:** R-004
+**Status:** `done` **Deps:** R-004
+**Files:** `crates/excalidraw-image/tests/errors.rs`, `crates/excalidraw-image/src/main.rs`, `crates/excalidraw-image/src/argv.rs`
 **Acceptance:**
 - Invalid JSON input: exit 1, stderr starts with `error: failed to parse`.
 - Missing file: exit 1, stderr mentions the path.
 - Unknown flag: exit 2, stderr prints `--help`.
 - JS-thrown error: exit 1, stderr includes the JS error message (not just `Error: undefined`).
 
+**Notes (completion):**
+- `argv.rs` gained an `ArgvError::Parse` enum variant so main.rs can
+  branch on exit code without string-matching. Today there's only one
+  variant; the shape is kept for a future `Help` / `Version` path if we
+  ever move those out of `std::process::exit(0)` inline.
+- `main.rs` wraps argv errors as `RunError::Argv` (exit 2) and runtime
+  errors (missing file, JSON parse, render failure) as
+  `RunError::Runtime` (exit 1). All runtime messages flow through
+  `anyhow::Context`, producing the required `error: failed to …`
+  prefix on stderr.
+- Harness at `crates/excalidraw-image/tests/errors.rs` covers the 4
+  acceptance cases. The JS-error case feeds a valid-JSON-but-wrong-shape
+  scene via stdin (`elements: "not-an-array"`) to trigger a throw deep
+  in `exportToSvg`; asserts exit=1, stderr starts with `error:`, and
+  `error: undefined` does NOT leak through.
+- Unknown-flag test also asserts the stderr body mentions `--help` or
+  `Usage`. main.rs prints both `error:` and a `run \`excalidraw-image
+  --help\` for usage.` hint on argv errors.
+
 ---
 
 ## PNG — Phase 7: PNG via native `resvg`
 
 ### PNG-001 — `src/raster.rs` — `resvg` integration
-**Status:** `blocked` **Deps:** R-004, R-005
+**Status:** `todo` **Deps:** R-004, R-005
 **Ref:** `PLAN.md` §5.5
 **Acceptance:**
 - `raster::svg_to_png(svg, args) -> Result<Vec<u8>>`.
@@ -781,7 +860,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 ## SZ — Phase 8: Size + cross-compile
 
 ### SZ-001 — Cross-compile matrix via `cross` or per-OS runners
-**Status:** `blocked` **Deps:** R-007
+**Status:** `todo` **Deps:** R-007
 **Ref:** `PLAN.md` §8.2
 **Acceptance:**
 - Local `make rust-cross` builds all 5 targets: `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`.
@@ -868,7 +947,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 **Acceptance:** Documents expected divergences from web-app output and why. Links to relevant PLAN sections.
 
 ### D-004 — Fixture snapshot baseline
-**Status:** `blocked` **Deps:** R-007
+**Status:** `todo` **Deps:** R-007
 **Acceptance:** All `tests/fixtures/*.excalidraw` have committed golden `.svg` (and `.png` for Phase 7 fixtures). `vitest -u` and `cargo insta review` workflows documented in README.
 
 ---
