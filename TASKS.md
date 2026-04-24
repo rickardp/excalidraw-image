@@ -431,7 +431,7 @@ the task, and hand off.
 - CLI output shows: Latin glyphs resolve to Excalifont, CJK glyphs to Xiaolai via unicode-range matching.
 
 ### FNT-007 — Wrap-parity fixture (§4A.8 gate 5)
-**Status:** `blocked` **Deps:** T-006
+**Status:** `done` **Deps:** T-006
 **Files:** `tests/fixtures/wrap-400.excalidraw`
 **Acceptance:**
 - 400-char paragraph at 300 px container width.
