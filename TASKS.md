@@ -414,14 +414,45 @@ the task, and hand off.
 - Xiaolai uses CJK codepoints instead of ABC.
 
 ### FNT-005 — Browser fidelity test (§4A.8 gate 3)
-**Status:** `todo` **Deps:** T-006, FNT-004
-**Files:** `tests/js/browser-fidelity.test.mjs`
+**Status:** `done` **Deps:** T-006, FNT-004
+**Files:** `tests/js/browser-fidelity.test.mjs`, `src/scripts/browser-font-baseline.mjs`, `tests/fixtures/browser-font-baseline.json`
 **Ref:** `PLAN.md` §4A.8 gate 3
 **Acceptance:**
 - Playwright headless-Chrome renders CLI output for a 100-char string in each family.
 - Extracts computed text width via `getComputedTextLength()`.
 - Baseline widths captured once from a reference excalidraw.com render; committed to `tests/js/fixtures/font-fidelity-baseline.json`.
 - Tolerance: ≤2 px per 100-char string.
+
+**Notes (completion):**
+- Scope deviation from the original wording (agreed with orchestrator). The
+  reference oracle is Chromium's native `canvas.measureText` over a page
+  that self-hosts our bundled WOFF2s via `@font-face`, not excalidraw.com.
+  Same font bytes ship to both sides, no network, CI-stable. Kept
+  `@playwright/test` (chromium only, no firefox/webkit). Baseline length
+  reduced to 43 chars (Latin) / 12 chars (CJK); tolerance scales per-char
+  (0.02 px/char = 2 px/100 chars) so the PLAN acceptance still holds.
+- `getComputedTextLength()` path was dropped in favor of
+  `canvas.measureText().width` because Excalidraw's export pipeline uses
+  canvas metrics (see `FontkitTextMetricsProvider.getLineWidth`) — the
+  apples-to-apples comparison is canvas ↔ canvas.
+- Xiaolai test text had to be scoped to a single shard. The family ships
+  as 209 per-codepoint shards (no single shard covers an arbitrary CJK
+  string), and `FontkitTextMetricsProvider` currently picks one shard per
+  query (TODO(FNT-009) in `text-metrics.mjs`). Using a 12-char string
+  that lives entirely in shard[20] sidesteps the limitation without
+  modifying `src/core/**`. When FNT-009 lands (per-codepoint shard
+  routing), this can be upgraded to an arbitrary CJK string.
+- Observed deltas across all 8 families are ≤0.0005 px, orders of
+  magnitude below the ±0.86 px / ±0.24 px tolerances. fontkit's
+  `layout()` applies no shaping features beyond advance widths; Chrome's
+  default canvas state matches. No tolerances widened.
+- Two artifacts: the Playwright-driven baseline script is NOT run at
+  test time (`tests/js/browser-fidelity.test.mjs` reads the committed
+  JSON). Regen is an explicit manual step — `npm run baseline:fonts` +
+  commit.
+- T-006's line-count gate can now be upgraded to column-level parity
+  using the same Playwright infra; FNT-011 gains a ready-to-reuse
+  canvas-measurement harness for family-fallback round-trips.
 
 ### FNT-006 — Mixed-script fixture (§4A.8 gate 4)
 **Status:** `done` **Deps:** P-003

@@ -11,6 +11,7 @@
     "test": "vitest run",
     "build": "node src/scripts/build-core.mjs",
     "audit": "node src/scripts/metafile-audit.mjs",
+    "baseline:fonts": "node src/scripts/browser-font-baseline.mjs",
     "test:snapshot:update": "echo 'T-006: regenerate tests/fixtures/text-wrapped.expected.json by running the capture driver. Manual for now; the full baseline-update workflow lands with FNT-005 (Playwright oracle).' && exit 1"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "linkedom": "0.18.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "eslint": "^10.2.1",
     "fonteditor-core": "^2.4.1",
     "globals": "^17.5.0",
