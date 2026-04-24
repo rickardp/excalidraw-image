@@ -439,27 +439,63 @@ the task, and hand off.
 - CLI output must match within ±1 break column per line.
 
 ### FNT-008 — Helvetica → Liberation aliasing
-**Status:** `blocked` **Deps:** J-008
+**Status:** `done` **Deps:** J-008
 **Ref:** `PLAN.md` §4A.5
 **Acceptance:**
 - Scene with `font-family: Helvetica` renders text with Liberation Sans metrics.
 - Emitted SVG `font-family` string still lists `Helvetica` first (so embedded-scene round-trips).
 
+**Notes (completion):** Already working from T-001 — `FAMILY_ALIASES`
+routes Helvetica measurements to Liberation Sans in `text-metrics.mjs`.
+Upstream Excalidraw writes `font-family="Helvetica, sans-serif, Segoe UI
+Emoji"` as-is onto the `<text>` element (no rewrite in our render path).
+Added `tests/js/font-helvetica-alias.test.mjs`: renders an inline
+fontFamily=2 scene via the bundle, asserts SVG attribute starts with
+`Helvetica`, and asserts `getLineWidth("…", "20px Helvetica")` is
+bit-identical to `getLineWidth("…", "20px Liberation")` (and distinct
+from Excalifont).
+
 ### FNT-009 — Unknown family fallback + `--strict-fonts`
-**Status:** `blocked` **Deps:** J-008
+**Status:** `done` **Deps:** J-008
 **Ref:** `PLAN.md` §4A.5
 **Acceptance:**
 - By default, unknown numeric family IDs render with Excalifont metrics.
 - `opts.strictFonts: true` in the `__render` call rejects with an error listing offending families.
 - Rust `--strict-fonts` flag maps to this option (see R-002).
 
+**Notes (completion):** Provider-side fallback to Excalifont was already
+wired by T-001 (`FALLBACK_FAMILY` in text-metrics.mjs). Added
+`ALLOWED_FIRST_FAMILIES` allowlist + `_collectFirstFamilies(svg)` helper
+in `src/core/index.mjs`; `render()` now post-scans the emitted SVG when
+`opts.strictFonts === true` and throws
+`Error("Unsupported font families in scene: …")` if any first-family is
+not in the allowlist. Test fixture uses `fontFamily: 99` — upstream
+falls through to "Segoe UI Emoji" as first family, which is not
+allowlisted (PLAN §4A.6 local-only), so strict mode rejects. Covered in
+`tests/js/font-strict-fonts.test.mjs` (both object-opts and JSON-string
+opts paths for R-003 parity).
+
 ### FNT-010 — Emoji local-only handling
-**Status:** `blocked` **Deps:** J-008
+**Status:** `done` **Deps:** J-008
 **Ref:** `PLAN.md` §4A.6
 **Acceptance:**
 - No `@font-face` is emitted for Segoe UI Emoji.
 - The SVG `font-family` string still keeps `Segoe UI Emoji` in the fallback list.
 - Documented in README as a known limitation.
+
+**Notes (completion):** Policy verification only — no code changes
+required. Upstream's font export path skips families with only
+`src: local(...)` descriptors (PLAN §4A.6), so Segoe UI Emoji and
+Helvetica never appear in `@font-face`. Empirical finding in
+`tests/js/font-emoji-local-only.test.mjs`: `skipInliningFonts: true` in
+our `exportToSvg` call does NOT suppress all `@font-face` rules —
+Excalifont + Xiaolai still ship as inline data-URL faces in
+`<defs><style class="style-fonts">`. The local-only guarantee is
+independent of that flag; tests assert the absence of Segoe/Helvetica
+`@font-face` specifically. `font-family` attribute on the mixed-script
+fixture's `<text>` preserves
+`"Excalifont, Xiaolai, Segoe UI Emoji"` including the emoji fallback.
+README note deferred to D-001 (the README itself doesn't exist yet).
 
 ### FNT-011 — `.excalidraw.svg` font metadata round-trip (§4A.8 gate 6)
 **Status:** `todo` **Deps:** E-001

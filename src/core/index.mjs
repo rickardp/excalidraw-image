@@ -36,6 +36,60 @@
 import "./shims/install.mjs";
 import { getSharedTextMetricsProvider } from "./text-metrics.mjs";
 
+// FNT-009 — allowlist of font family names that may appear as the FIRST
+// family in an emitted `<text font-family="…">` attribute when the caller
+// passes `opts.strictFonts: true`. See PLAN.md §4A.5.
+//
+// Rationale for each entry:
+//   - Excalifont, Virgil, Nunito, "Lilita One", "Comic Shanns", Cascadia —
+//     the six scene fonts Excalidraw ships as bundled WOFF2s.
+//   - "Liberation Sans" — the numeric id 9 family (see
+//     packages/common/src/constants.ts FONT_FAMILY). Emitted as-is when a
+//     scene sets fontFamily=9.
+//   - Helvetica — numeric id 2. We do NOT rewrite the SVG attribute
+//     (PLAN §4A.5 point 3: the SVG string must keep Helvetica so
+//     .excalidraw.svg payloads round-trip). Metrics are routed to
+//     Liberation Sans via FAMILY_ALIASES inside text-metrics.mjs.
+//   - Assistant — numeric id 10. Bundled as a WOFF2 in FONT_ASSETS.
+//   - Xiaolai — CJK fallback family. Rarely appears FIRST (it normally
+//     sits second in the fallback list per getFontFamilyFallbacks), but
+//     some scenes/tests emit it first; allow it here to avoid rejecting
+//     legitimate CJK-only fixtures.
+const ALLOWED_FIRST_FAMILIES = new Set([
+  "Excalifont",
+  "Virgil",
+  "Nunito",
+  "Lilita One",
+  "Comic Shanns",
+  "Cascadia",
+  "Liberation Sans",
+  "Liberation",
+  "Helvetica",
+  "Assistant",
+  "Xiaolai",
+]);
+
+// Extracts the first family name from every `font-family="…"` attribute in
+// the SVG. Strips surrounding single/double quotes (CSS allows
+// `font-family="'Comic Shanns', sans-serif"`). Returns a de-duplicated
+// array preserving insertion order.
+function _collectFirstFamilies(svg) {
+  const seen = new Set();
+  const out = [];
+  for (const m of svg.matchAll(/font-family="([^"]+)"/g)) {
+    const first = m[1]
+      .split(",")[0]
+      .trim()
+      .replace(/^['"]|['"]$/g, "")
+      .trim();
+    if (first && !seen.has(first)) {
+      seen.add(first);
+      out.push(first);
+    }
+  }
+  return out;
+}
+
 // Lazy, cached loader for exportToSvg. Caching the Promise (not the
 // resolved value) means concurrent callers all await the same import.
 //
@@ -98,7 +152,27 @@ async function render(sceneJsonOrString, opts = {}) {
     { skipInliningFonts: true },
   );
 
-  return { svg: svgEl.outerHTML };
+  const svg = svgEl.outerHTML;
+
+  // FNT-009 — strict-fonts gate. When enabled, scan the emitted SVG for any
+  // `font-family="…"` attribute whose FIRST family is not in
+  // ALLOWED_FIRST_FAMILIES and throw. Default (undefined/false) behavior
+  // is permissive: unknown numeric fontFamily IDs fall through to the
+  // Excalifont metrics path already wired in text-metrics.mjs. See
+  // PLAN §4A.5 for the policy.
+  if (opts.strictFonts) {
+    const firstFamilies = _collectFirstFamilies(svg);
+    const unknown = firstFamilies.filter(
+      (f) => !ALLOWED_FIRST_FAMILIES.has(f),
+    );
+    if (unknown.length > 0) {
+      throw new Error(
+        `Unsupported font families in scene: ${unknown.join(", ")}`,
+      );
+    }
+  }
+
+  return { svg };
 }
 
 // Public surface. The Rust host (R-003) passes `optsJson` as a JSON string;
