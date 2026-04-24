@@ -424,7 +424,7 @@ the task, and hand off.
 - Tolerance: ≤2 px per 100-char string.
 
 ### FNT-006 — Mixed-script fixture (§4A.8 gate 4)
-**Status:** `blocked` **Deps:** P-003
+**Status:** `done` **Deps:** P-003
 **Files:** `tests/fixtures/mixed-script.excalidraw`
 **Acceptance:**
 - Scene text contains Latin + CJK (via Xiaolai fallback) + emoji (best-effort) in a single text element.
