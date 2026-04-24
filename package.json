@@ -9,7 +9,8 @@
   "scripts": {
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.{mjs,ts,mts}\"",
     "test": "vitest run",
-    "build": "node src/scripts/build-core.mjs"
+    "build": "node src/scripts/build-core.mjs",
+    "audit": "node src/scripts/metafile-audit.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",

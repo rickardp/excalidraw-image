@@ -6,7 +6,7 @@
 
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap core fonts dev rust parity test clean
+.PHONY: help bootstrap core fonts dev rust parity audit test clean
 
 help:
 	@echo "excalidraw-image — available targets:"
@@ -17,6 +17,7 @@ help:
 	@echo "  make dev         Run the Deno dev loop on tests/fixtures/basic-shapes.excalidraw."
 	@echo "  make rust        Build the Rust shell (target/release/excalidraw-image)."
 	@echo "  make parity      Diff Deno vs Rust output on every fixture (R-007)."
+	@echo "  make audit       Fail if dist/core.mjs pulls forbidden imports (J-011)."
 	@echo "  make test        Run vitest, cargo test, and the parity gate."
 	@echo "  make clean       Remove build outputs (dist/, target/, node_modules/.cache)."
 	@echo ""
@@ -47,9 +48,14 @@ rust:
 parity:
 	@echo "not-yet-implemented (R-007)"
 
+# J-011: CI gate against forbidden imports in dist/core.mjs. Requires a
+# fresh dist/meta.json, so build core first.
+audit: core
+	npm run audit
+
 # vitest with --passWithNoTests so phase 0 has no failures from an empty suite.
 # cargo test runs against the R-001 placeholder crate; parity is a no-op today.
-test:
+test: audit
 	npx vitest run --passWithNoTests
 	cargo test
 	$(MAKE) parity

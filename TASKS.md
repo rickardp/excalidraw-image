@@ -243,7 +243,7 @@ the task, and hand off.
   task scope forbids editing shims, flagging for a follow-up on J-001.
 
 ### J-011 — `src/scripts/metafile-audit.mjs` — CI gate for forbidden imports
-**Status:** `todo` **Deps:** J-010
+**Status:** `done` **Deps:** J-010
 **Ref:** `PLAN.md` §5.7 step 4
 **Acceptance:**
 - Reads `dist/meta.json`, fails (exit 1) if any input path matches: `**/components/App.tsx`, `**/components/LayerUI.tsx`, `**/actions/**`, `**/hooks/**`, `**/i18n.ts`, `**/locales/**`, `**/css/**`.
