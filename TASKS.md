@@ -122,7 +122,7 @@ the task, and hand off.
 ## J — Phase 1: JS core minimal happy path (no text)
 
 ### J-001 — `src/core/shims/dom.mjs`
-**Status:** `todo` **Deps:** P-002, F-001 (both `done`)
+**Status:** `done` **Deps:** P-002, F-001 (both `done`)
 **Ref:** `PLAN.md` §4.2, upstream `SVG_EXPORT.md` §3.1, §4, `PHASE0.md` §"Finding C"
 **Acceptance:**
 - Installs linkedom `window`, `document`, `Node`, `Element`, `HTMLElement`, `SVGElement`, `DocumentFragment` on `globalThis`.
@@ -131,7 +131,7 @@ the task, and hand off.
 - Unit test: after importing, `typeof globalThis.devicePixelRatio === "number"` and equals 1.
 
 ### J-002 — `src/core/shims/web-globals.mjs` (EXPANDED per F-002)
-**Status:** `blocked` **Deps:** J-001
+**Status:** `todo` **Deps:** J-001
 **Ref:** `PHASE0.md` §"Finding B", `PLAN.md` §4.2
 **Acceptance:**
 - File renamed from `base64.mjs` to `web-globals.mjs` — F-002 discovered `deno_core` lacks many Web-platform globals that Deno silently provides. This shim now covers the full set.
@@ -150,7 +150,7 @@ the task, and hand off.
 **Agent notes:** Start from `spike-rust/src/polyfills.js` (the minimum set F-002 proved necessary). Expand to the full list. Also update `PLAN.md` §7 repo-layout to rename the shim file.
 
 ### J-003 — `src/core/shims/fonts.mjs`
-**Status:** `blocked` **Deps:** J-001
+**Status:** `todo` **Deps:** J-001
 **Ref:** `PLAN.md` §4.2, §4A.6
 **Acceptance:**
 - `globalThis.FontFace` stores `family`, `style`, `weight`, `display`, `unicodeRange` verbatim; `load()` returns `Promise.resolve(this)`.
@@ -158,7 +158,7 @@ the task, and hand off.
 - Unit test: constructing `new FontFace("Virgil", "url(...)", { unicodeRange: "U+0000-00FF" })` and adding to `document.fonts` reflects in `has`/`check`.
 
 ### J-004 — `src/core/shims/fetch-fonts.mjs`
-**Status:** `blocked` **Deps:** J-001, FNT-002
+**Status:** `todo` **Deps:** J-001, FNT-002
 **Ref:** `PLAN.md` §4.2, §4A.7
 **Acceptance:**
 - Installs `globalThis.fetch` that resolves URLs matching Excalidraw's font asset pattern from the base64 map in `font-assets.mjs`.
@@ -167,7 +167,7 @@ the task, and hand off.
 - Unit test: stub a font asset path; `await fetch(url).arrayBuffer()` returns the expected byte length.
 
 ### J-005 — `src/core/shims/canvas.mjs` (skeleton, no text metrics yet)
-**Status:** `blocked` **Deps:** J-001
+**Status:** `todo` **Deps:** J-001
 **Ref:** `PLAN.md` §4.2, upstream `SVG_EXPORT.md` §3.2
 **Acceptance:**
 - Wraps `document.createElement` so `"canvas"` returns an object with `getContext("2d")` that has `font` (settable string) and `measureText(text) → { width: text.length * 8 }` (placeholder — replaced in T-003).
@@ -175,7 +175,7 @@ the task, and hand off.
 - Unit test: `document.createElement("canvas").getContext("2d").measureText("abc").width > 0`.
 
 ### J-006 — `src/core/shims/workers.mjs`
-**Status:** `blocked` **Deps:** J-001
+**Status:** `todo` **Deps:** J-001
 **Ref:** `PLAN.md` §4.2
 **Acceptance:**
 - Ensures `globalThis.Worker` is `undefined` at module load.
