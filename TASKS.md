@@ -307,11 +307,37 @@ the task, and hand off.
 - Same `FontkitTextMetricsProvider` instance is shared with T-004.
 
 ### T-004 — Register provider via `setCustomTextMetricsProvider`
-**Status:** `todo` **Deps:** T-001, J-008
+**Status:** `done` **Deps:** T-001, J-008
 **Ref:** upstream `SVG_EXPORT.md` §3.2
 **Acceptance:**
 - `src/core/index.mjs` imports and calls `setCustomTextMetricsProvider(provider)` from `@excalidraw/element/textMeasurements` once.
 - Without this call, text-wrapped fixture wraps at wrong width (sanity regression test).
+
+**Notes (completion):**
+- **Acceptance path correction.** `@excalidraw/element/textMeasurements` is a
+  monorepo-internal package alias; the npm dist of `@excalidraw/excalidraw`
+  (0.18.1) is a single bundled package whose `exports` map only surfaces the
+  root `.` and types via `./*`. There is no `element/textMeasurements`
+  subpath. Verified by reading
+  `node_modules/@excalidraw/excalidraw/package.json`.
+  `setCustomTextMetricsProvider` IS re-exported from the package root
+  (`dist/prod/index.js` last line, renamed `DT`), so the registration is
+  performed via the existing dynamic `import("@excalidraw/excalidraw")`
+  inside `loadExportToSvg()`.
+- Registration fires exactly once (the Promise is cached) and passes the
+  `getSharedTextMetricsProvider()` singleton — the same instance the T-003
+  canvas shim delegates to — so the two metric paths (provider-hook and
+  direct canvas) stay coherent.
+- Soft guard: call is wrapped in a `typeof mod.setCustomTextMetricsProvider
+  === "function"` check. Excalidraw could tree-shake it out in a minor
+  version; in that case `CanvasTextMetricsProvider` stays the default and
+  its `measureText` call still lands on our T-003 canvas shim, so metrics
+  remain fontkit-backed. (Effectively Outcome B as a fallback.)
+- Verified via new vitest assertion in `tests/js/render.test.mjs` that
+  mocks `@excalidraw/excalidraw` and observes a single
+  `setCustomTextMetricsProvider` call with the shared provider instance.
+  End-to-end: `make core` + Deno load of `dist/core.mjs` renders the
+  `text-wrapped` fixture to 2 `<text>` elements, 870×240 viewBox.
 
 ### T-005 — Fixture: wrapped text + long text
 **Status:** `done` **Deps:** P-003

@@ -8,7 +8,7 @@
 // run here). End-to-end rendering is covered by the bundled smoke test in
 // J-012 under Deno.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 describe("src/core/index.mjs (__render entry)", () => {
   it("registers globalThis.__render as a function on import", async () => {
@@ -71,5 +71,47 @@ describe("src/core/index.mjs (__render entry)", () => {
     const noOpts = globalThis.__render({ elements: [], appState: {} });
     expect(typeof noOpts.then).toBe("function");
     await noOpts.catch(() => {});
+  });
+});
+
+describe("T-004: fontkit text-metrics provider registration", () => {
+  // We mock @excalidraw/excalidraw because its real package root cannot load
+  // under plain Node (esbuild aliases stub React/Jotai/etc. at BUNDLE time).
+  // The mock gives us observable `setCustomTextMetricsProvider` /
+  // `exportToSvg` spies so we can assert the registration path runs exactly
+  // once per core-module lifetime and receives the shared fontkit instance.
+  it("calls setCustomTextMetricsProvider with the shared fontkit provider exactly once", async () => {
+    const setCustomTextMetricsProvider = vi.fn();
+    const exportToSvg = vi.fn(async () => ({ outerHTML: "<svg/>" }));
+    vi.doMock("@excalidraw/excalidraw", () => ({
+      setCustomTextMetricsProvider,
+      exportToSvg,
+    }));
+
+    // Fresh module graph so the mock is picked up and the cached
+    // `exportToSvgPromise` starts empty.
+    vi.resetModules();
+    await import("../../src/core/index.mjs");
+    const { getSharedTextMetricsProvider } = await import(
+      "../../src/core/text-metrics.mjs"
+    );
+
+    // Trigger the lazy loader twice; the registration must still fire only
+    // once because the resolved Promise is cached.
+    await globalThis
+      .__render({ elements: [], appState: {} })
+      .catch(() => {});
+    await globalThis
+      .__render({ elements: [], appState: {} })
+      .catch(() => {});
+
+    expect(setCustomTextMetricsProvider).toHaveBeenCalledTimes(1);
+    expect(setCustomTextMetricsProvider).toHaveBeenCalledWith(
+      getSharedTextMetricsProvider(),
+    );
+    expect(exportToSvg).toHaveBeenCalled();
+
+    vi.doUnmock("@excalidraw/excalidraw");
+    vi.resetModules();
   });
 });

@@ -34,14 +34,36 @@
 // - Host-neutral: no `process`, `Bun`, `Deno`, `fs`, `path`, `node:*`.
 
 import "./shims/install.mjs";
+import { getSharedTextMetricsProvider } from "./text-metrics.mjs";
 
 // Lazy, cached loader for exportToSvg. Caching the Promise (not the
 // resolved value) means concurrent callers all await the same import.
+//
+// T-004: while resolving the module we also register the shared fontkit
+// text-metrics provider via `setCustomTextMetricsProvider`. The upstream
+// source path is `@excalidraw/element/textMeasurements` (see
+// `/Users/rickard/oss/excalidraw/SVG_EXPORT.md` §3.2), but the npm dist of
+// `@excalidraw/excalidraw` is a SINGLE bundled package — the subpath import
+// is not surfaced by the `exports` map. Verified by grep: the symbol IS
+// re-exported from the package root (`mod.setCustomTextMetricsProvider`),
+// so we pull it from there.
+//
+// Without this call, `CanvasTextMetricsProvider` is lazily instantiated by
+// Excalidraw on first `getLineWidth` use. That default provider ultimately
+// delegates to `document.createElement("canvas").getContext("2d").measureText`
+// — which our T-003 canvas shim already routes to the same shared fontkit
+// provider. Registering explicitly is still preferable: (a) it matches
+// upstream §3.2's recommended API surface, (b) it short-circuits one layer
+// of indirection, and (c) it guards against upstream refactoring the default
+// provider off of the canvas path in a future version.
 let exportToSvgPromise;
 function loadExportToSvg() {
-  exportToSvgPromise ??= import("@excalidraw/excalidraw").then(
-    (mod) => mod.exportToSvg,
-  );
+  exportToSvgPromise ??= import("@excalidraw/excalidraw").then((mod) => {
+    if (typeof mod.setCustomTextMetricsProvider === "function") {
+      mod.setCustomTextMetricsProvider(getSharedTextMetricsProvider());
+    }
+    return mod.exportToSvg;
+  });
   return exportToSvgPromise;
 }
 
