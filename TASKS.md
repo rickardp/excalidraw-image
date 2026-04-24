@@ -462,7 +462,7 @@ the task, and hand off.
 - Documented in README as a known limitation.
 
 ### FNT-011 — `.excalidraw.svg` font metadata round-trip (§4A.8 gate 6)
-**Status:** `blocked` **Deps:** E-001
+**Status:** `todo` **Deps:** E-001
 **Files:** `tests/js/font-roundtrip.test.mjs`
 **Acceptance:**
 - Export a scene with `--embed-scene`; decode the base64 payload back.
@@ -518,14 +518,33 @@ the task, and hand off.
 ## E — Phase 5: Editable `.excalidraw.svg`
 
 ### E-001 — `--embed-scene` wiring
-**Status:** `blocked` **Deps:** J-008
+**Status:** `done` **Deps:** J-008
 **Ref:** `PLAN.md` §4.4, upstream `SVG_EXPORT.md` §3.5
 **Acceptance:**
 - `__render(scene, { embedScene: true })` sets `appState.exportEmbedScene = true`.
 - Output SVG contains `<!-- svg-source:excalidraw -->`, `<metadata>`, `<!-- payload-start -->…`, `<!-- payload-end -->` in the documented order.
 
+**Notes (completion):**
+- Pipeline already wired via `src/core/index.mjs` (J-008): `opts.embedScene`
+  folds into `appState.exportEmbedScene`. No code change needed.
+- Test added at `tests/js/embed-scene.test.mjs` (4 cases). Sanity-run on
+  `basic-shapes.excalidraw` confirmed all four markers present in the
+  `embedScene: true` output; `<metadata>` appears exactly once.
+- Upstream clarification
+  (`/Users/rickard/oss/excalidraw/packages/excalidraw/scene/export.ts:364,374`):
+  `<!-- svg-source:excalidraw -->` and the (possibly empty) `<metadata>`
+  element are emitted **unconditionally**. Only `payload-start`,
+  `payload-end`, and the base64 body between them are gated on
+  `exportEmbedScene`. The "without embedScene" assertion was tightened to
+  reflect that: plain SVG must not contain `payload-start` / `payload-end`,
+  but an empty `<metadata />` is acceptable.
+- Boundary with E-002 / E-003 documented in the test header: E-001 only
+  confirms marker presence; E-002 owns linkedom serialization fidelity of
+  the `<metadata>` children; E-003 owns the base64 decode + deep-equal
+  round-trip.
+
 ### E-002 — linkedom metadata serialization test
-**Status:** `blocked` **Deps:** E-001
+**Status:** `todo` **Deps:** E-001
 **Files:** `tests/js/metadata-serialization.test.mjs`
 **Ref:** `PLAN.md` §11 risk 6
 **Acceptance:**
@@ -533,7 +552,7 @@ the task, and hand off.
 - If linkedom collapses/reorders children, task is reopened with a mitigation plan (manual string injection).
 
 ### E-003 — Round-trip test
-**Status:** `blocked` **Deps:** E-001
+**Status:** `todo` **Deps:** E-001
 **Files:** `tests/js/roundtrip.test.mjs`
 **Acceptance:**
 - For each fixture: `__render(scene, { embedScene: true }).svg` → extract base64 → `decodeSvgBase64Payload` from `@excalidraw/excalidraw/data/encode` → deep-equal original `elements` and `files` (ignoring `source` field).
