@@ -167,7 +167,7 @@ the task, and hand off.
 - Unit test: stub a font asset path; `await fetch(url).arrayBuffer()` returns the expected byte length.
 
 ### J-005 — `src/core/shims/canvas.mjs` (skeleton, no text metrics yet)
-**Status:** `todo` **Deps:** J-001
+**Status:** `done` **Deps:** J-001
 **Ref:** `PLAN.md` §4.2, upstream `SVG_EXPORT.md` §3.2
 **Acceptance:**
 - Wraps `document.createElement` so `"canvas"` returns an object with `getContext("2d")` that has `font` (settable string) and `measureText(text) → { width: text.length * 8 }` (placeholder — replaced in T-003).
