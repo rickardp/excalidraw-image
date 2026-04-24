@@ -1,0 +1,16 @@
+{
+  "$comment": "Captured baseline for T-006 line-wrap regression gate. Regenerate via: npm run test:snapshot:update. Full browser-oracle comparison deferred to FNT-005.",
+  "textElements": [
+    {
+      "firstChars": "Sphinx of black quar",
+      "lineCount": 1,
+      "containerWidth": 300
+    },
+    {
+      "firstChars": "Excalifont is the bu",
+      "lineCount": 1,
+      "containerWidth": 500
+    }
+  ],
+  "svgLength": 16736
+}

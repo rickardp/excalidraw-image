@@ -349,12 +349,34 @@ the task, and hand off.
 **Notes:** hand-crafted by the orchestrator; renders cleanly via bundled `dist/core.mjs` — 2 `<text>` elements, viewBox `0 0 870 240`. Excalidraw.com round-trip not yet manually verified; flag if downstream T-006 fails structurally.
 
 ### T-006 — Line-wrap parity gate (§4A.2)
-**Status:** `blocked` **Deps:** T-003, T-004, T-005
+**Status:** `done` **Deps:** T-003, T-004, T-005
 **Ref:** `PLAN.md` §4A.2, §4A.8 gate 5
 **Acceptance:**
 - Headless-browser oracle (Playwright + excalidraw.com) renders the fixture; records line break columns per paragraph.
 - Our CLI renders the same fixture; line break columns must be within ±1 per line.
 - Failure prints both sides for the failing line. Gate blocks Phase 2 completion.
+
+**Notes:** scope reduced to snapshot-based regression gate per orchestrator direction. Full Playwright + excalidraw.com browser oracle is deferred to FNT-005, which needs Playwright anyway — that infra will be reused to upgrade this gate post-landing. The ±1 line per paragraph tolerance from PLAN §4A.2 is reflected in the snapshot, not against a live browser.
+
+- Implementation: `tests/fixtures/text-wrapped.expected.json` (baseline)
+  + `tests/js/wrap-regression.test.mjs` (vitest gate).
+- How wrap lines manifest in the SVG: upstream
+  `renderer/staticSvgScene.ts` splits `element.text` on `"\n"` and emits
+  one sibling `<text>` node per line inside the element's group `<g>` —
+  NOT `<tspan>` children, NOT multiple `y`/`dy` deltas on one node. The
+  gate groups observed `<text>` nodes back into paragraphs by matching
+  each first-line's leading chars against the baseline's `firstChars`.
+- Observed baseline for `text-wrapped.excalidraw`: 2 `<text>` nodes total
+  (one per paragraph), 1 line each, 16736-byte SVG. The fixture stores
+  unwrapped `text` (no embedded `\n`), so Excalidraw's export path emits
+  one node per paragraph. Tolerances: ±1 line per paragraph, ±10 % SVG
+  length — loose enough that Phase 3 FNT metric drift won't trip the
+  gate, tight enough to catch catastrophic regressions.
+- FNT-005 will upgrade this gate by (a) running the same fixture on
+  excalidraw.com in headless Chrome, (b) capturing authoritative line
+  break columns per paragraph, (c) replacing the line-count assertion
+  with column-level `±1 per line` comparison, and (d) committing a
+  genuine browser-oracle baseline alongside the current snapshot.
 
 ---
 

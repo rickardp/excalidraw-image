@@ -10,7 +10,8 @@
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.{mjs,ts,mts}\"",
     "test": "vitest run",
     "build": "node src/scripts/build-core.mjs",
-    "audit": "node src/scripts/metafile-audit.mjs"
+    "audit": "node src/scripts/metafile-audit.mjs",
+    "test:snapshot:update": "echo 'T-006: regenerate tests/fixtures/text-wrapped.expected.json by running the capture driver. Manual for now; the full baseline-update workflow lands with FNT-005 (Playwright oracle).' && exit 1"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.1",
