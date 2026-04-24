@@ -12,5 +12,9 @@ export default defineConfig({
       "spike/**",
       "spike-rust/**",
     ],
+    // 20 MB dist/core.mjs + font subsetting on first import occasionally
+    // trips the default 5s timeout under concurrent load.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
   },
 });
