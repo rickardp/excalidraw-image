@@ -1,0 +1,59 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://github.com/rickardp/excalidraw-svg-export",
+  "elements": [
+    {
+      "id": "img-elem-cropped-1",
+      "type": "image",
+      "x": 100,
+      "y": 100,
+      "width": 80,
+      "height": 80,
+      "angle": 0,
+      "strokeColor": "transparent",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "solid",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a0",
+      "roundness": null,
+      "seed": 54321,
+      "version": 1,
+      "versionNonce": 1,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1700000000000,
+      "link": null,
+      "locked": false,
+      "fileId": "img-cropped-1",
+      "scale": [1, 1],
+      "status": "saved",
+      "crop": {
+        "x": 1,
+        "y": 1,
+        "width": 2,
+        "height": 2,
+        "naturalWidth": 4,
+        "naturalHeight": 4
+      }
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {
+    "img-cropped-1": {
+      "id": "img-cropped-1",
+      "mimeType": "image/png",
+      "dataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAEAQMAAACTPww9AAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGUExURf8AAP///0EdNBEAAAABYktHRAH/Ai3eAAAAB3RJTUUH6gQYEywRVscdgQAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyNi0wNC0yNFQxOTo0NDoxNyswMDowMD2t66YAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjYtMDQtMjRUMTk6NDQ6MTcrMDA6MDBM8FMaAAAAKHRFWHRkYXRlOnRpbWVzdGFtcAAyMDI2LTA0LTI0VDE5OjQ0OjE3KzAwOjAwG+VyxQAAAAtJREFUCNdjYIAAAAAIAAEvIN0xAAAAAElFTkSuQmCC",
+      "created": 1700000000000,
+      "lastRetrieved": 1700000000000
+    }
+  }
+}

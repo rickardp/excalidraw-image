@@ -478,12 +478,12 @@ the task, and hand off.
 **Acceptance:** Contains a PNG image element with `dataURL` in `files`. Opens cleanly on excalidraw.com.
 
 ### I-002 — Cropped image fixture (mask path)
-**Status:** `blocked` **Deps:** P-003
+**Status:** `done` **Deps:** P-003
 **Files:** `tests/fixtures/image-cropped.excalidraw`
 **Acceptance:** Image with non-trivial crop that exercises the `<mask>` code path in `renderer/staticSvgScene.ts`.
 
 ### I-003 — Frames fixture
-**Status:** `blocked` **Deps:** P-003
+**Status:** `wip` **Deps:** P-003
 **Files:** `tests/fixtures/frames.excalidraw`
 **Acceptance:** Two frames, one with a name that requires truncation (exercises `scene/export.ts:69`), children clipped to frame bounds.
 
