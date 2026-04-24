@@ -1,0 +1,18 @@
+# Placeholder manifest — scaffolding only (P-003).
+# The real crate is defined by task R-001 (PLAN.md §5.1).
+# This file exists so the workspace `members = ["crates/*"]` glob resolves
+# while the crate's src/ and assets/fonts/ dirs sit empty with .gitkeep.
+
+[package]
+name = "excalidraw-image"
+version = "0.0.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Placeholder — replaced by R-001."
+
+[lib]
+path = "src/lib.rs"

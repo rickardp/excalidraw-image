@@ -52,14 +52,14 @@ the task, and hand off.
 - `npm run lint` fails on a planted violation; passes after reverting.
 
 ### P-003 — Skeleton directory tree
-**Status:** `todo` **Deps:** P-001
+**Status:** `done` **Deps:** P-001
 **Files:** see `PLAN.md` §7.
 **Acceptance:**
 - All directories from §7 exist with a `.gitkeep` where empty.
 - `tests/fixtures/` contains at least `basic-shapes.excalidraw` (can be hand-crafted — one rectangle + one arrow).
 
 ### P-004 — Makefile targets
-**Status:** `blocked` **Deps:** P-001, P-003
+**Status:** `todo` **Deps:** P-001, P-003
 **Files:** `Makefile`
 **Acceptance:**
 - Targets: `bootstrap`, `core`, `fonts`, `dev`, `rust`, `parity`, `test`, `clean`.
@@ -73,7 +73,7 @@ the task, and hand off.
 ## F — Phase 0: Feasibility spike
 
 ### F-001 — Spike: bundle `@excalidraw/excalidraw` in Deno
-**Status:** `blocked` **Deps:** P-001, P-003
+**Status:** `todo` **Deps:** P-001, P-003
 **Ref:** `PLAN.md` §3.1
 **Files:** `spike/` (temporary; delete when done)
 **Acceptance:**
