@@ -299,7 +299,7 @@ the task, and hand off.
 - Unit tests cover at least 6 real scenes' font strings.
 
 ### T-003 — Wire canvas shim to fontkit provider
-**Status:** `todo` **Deps:** J-005, T-001
+**Status:** `done` **Deps:** J-005, T-001
 **Ref:** `PLAN.md` §4.2, upstream `SVG_EXPORT.md` §3.2
 **Acceptance:**
 - `document.createElement("canvas").getContext("2d").measureText(text).width` returns the fontkit-measured width for the current `font` string.

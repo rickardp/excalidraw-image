@@ -165,3 +165,14 @@ function _fontCoversText(font, text) {
   }
   return true;
 }
+
+// Shared lazy singleton. Consumers (canvas shim T-003, Excalidraw provider
+// registration T-004) must obtain the same instance so font caches and any
+// future per-provider state remain coherent. Instantiated on first access —
+// lazy construction avoids pulling fontkit into module-eval order when only
+// the parser is imported.
+let _shared = null;
+export function getSharedTextMetricsProvider() {
+  if (_shared === null) _shared = new FontkitTextMetricsProvider();
+  return _shared;
+}

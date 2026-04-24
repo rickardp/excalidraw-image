@@ -40,11 +40,42 @@ describe("installCanvasShim", () => {
     expect(width).toBeGreaterThan(0);
   });
 
-  it("placeholder width equals text.length * 8 (T-003 detection hook)", () => {
+  it("measureText is fontkit-backed, not the text.length * 8 placeholder", () => {
+    // T-003: width must come from the shared fontkit provider, not the
+    // J-005 placeholder. Default font is "10px sans-serif" which falls
+    // back to Excalifont; at 20px the spec's 30–80 range applies. Check
+    // both: reject the exact placeholder value, and at 20px assert a
+    // realistic Excalifont width range.
     const ctx = globalThis.document.createElement("canvas").getContext("2d");
-    expect(ctx.measureText("abc").width).toBe(3 * 8);
+    const defaultW = ctx.measureText("Hello").width;
+    expect(typeof defaultW).toBe("number");
+    expect(Number.isFinite(defaultW)).toBe(true);
+    expect(defaultW).toBeGreaterThan(0);
+    expect(defaultW).not.toBe(5 * 8);
+
+    ctx.font = "20px Excalifont";
+    const w20 = ctx.measureText("Hello").width;
+    expect(w20).not.toBe(5 * 8);
+    expect(w20).toBeGreaterThanOrEqual(30);
+    expect(w20).toBeLessThanOrEqual(80);
+  });
+
+  it("changing ctx.font changes the measured width (different families differ)", () => {
+    // T-003: honors `this.font`. Excalifont vs Virgil have different
+    // metrics, so the same string must produce distinct widths.
+    const ctx = globalThis.document.createElement("canvas").getContext("2d");
+    ctx.font = "20px Excalifont";
+    const excalifontWidth = ctx.measureText("Hello").width;
+    ctx.font = "20px Virgil";
+    const virgilWidth = ctx.measureText("Hello").width;
+    expect(excalifontWidth).toBeGreaterThan(0);
+    expect(virgilWidth).toBeGreaterThan(0);
+    expect(excalifontWidth).not.toBe(virgilWidth);
+  });
+
+  it("measureText('') returns { width: 0 }", () => {
+    const ctx = globalThis.document.createElement("canvas").getContext("2d");
     expect(ctx.measureText("").width).toBe(0);
-    expect(ctx.measureText("hello world").width).toBe(11 * 8);
   });
 
   it("uppercase 'CANVAS' also triggers the shim", () => {
@@ -52,7 +83,8 @@ describe("installCanvasShim", () => {
     expect(canvas).toBeDefined();
     const ctx = canvas.getContext("2d");
     expect(typeof ctx.measureText).toBe("function");
-    expect(ctx.measureText("x").width).toBe(8);
+    // Width must be positive (fontkit-backed), not necessarily 8.
+    expect(ctx.measureText("x").width).toBeGreaterThan(0);
   });
 
   it("non-canvas tags pass through to linkedom", () => {
@@ -101,6 +133,6 @@ describe("installCanvasShim", () => {
     expect(globalThis.document.createElement).toBe(createBefore);
     // And it must still route canvas → shim, not reach a stale linkedom path.
     const canvas = globalThis.document.createElement("canvas");
-    expect(canvas.getContext("2d").measureText("ab").width).toBe(16);
+    expect(canvas.getContext("2d").measureText("ab").width).toBeGreaterThan(0);
   });
 });

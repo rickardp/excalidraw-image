@@ -1,19 +1,21 @@
 // src/core/shims/canvas.mjs
 //
-// Canvas shim skeleton. See PLAN.md §4.2 and upstream SVG_EXPORT.md §3.2 for
-// the measurement contract. Two measurement paths exist in Excalidraw's export
-// code: the `CanvasTextMetricsProvider` (overridable) and a direct call in
-// `scene/export.ts` for frame-label truncation
+// Canvas shim. See PLAN.md §4.2 and upstream SVG_EXPORT.md §3.2 for the
+// measurement contract. Two measurement paths exist in Excalidraw's export
+// code: the `CanvasTextMetricsProvider` (overridable via
+// `setCustomTextMetricsProvider`) and a direct call in `scene/export.ts` for
+// frame-label truncation
 // (`document.createElement("canvas").getContext("2d").measureText(text).width`).
-// The second path is why this shim is needed — it bypasses the provider hook.
-//
-// For J-005 `measureText` returns a placeholder `{ width: text.length * 8 }`.
-// T-003 replaces that with fontkit-backed measurement; the placeholder width
-// (exactly `text.length * 8`) is easy for T-003 tests to detect if they ever
-// need to assert "fontkit has been wired in."
+// The second path bypasses the provider hook, so this shim must delegate to
+// the same fontkit-backed provider T-004 registers — otherwise the two paths
+// diverge and the frame-label truncation computes widths inconsistent with
+// the rest of the pipeline. Both paths converge on
+// `getSharedTextMetricsProvider()` from `../text-metrics.mjs`.
 //
 // Requires the DOM shim (J-001) so `document` and `HTMLElement` exist on
 // globalThis. Host-neutral: no node:*, no fs, no path. Idempotent.
+
+import { getSharedTextMetricsProvider } from "../text-metrics.mjs";
 
 let installed = false;
 
@@ -32,12 +34,23 @@ function makeContext2d() {
     fillStyle: "#000",
     strokeStyle: "#000",
 
-    // Placeholder — T-003 replaces this with a fontkit-backed implementation
-    // that honors `ctx.font`. The `* 8` factor is arbitrary but positive,
-    // which is all Excalidraw's truncation path needs to produce *some* frame
-    // label. Tests can detect the placeholder by the exact formula.
+    // T-003: delegate to the shared fontkit provider using the context's
+    // current `font` string. Method shorthand (not an arrow) so `this.font`
+    // resolves to this context object at call time.
+    //
+    // Fallback: on any provider error (e.g. fontkit load failure before the
+    // font-assets bundle is ready) degrade to the old `text.length * 8`
+    // placeholder rather than crashing the entire export pipeline. The
+    // truncation path in scene/export.ts only needs a positive finite width.
     measureText(text) {
-      return { width: String(text).length * 8 };
+      const s = text == null ? "" : String(text);
+      if (s === "") return { width: 0 };
+      try {
+        const provider = getSharedTextMetricsProvider();
+        return { width: provider.getLineWidth(s, this.font) };
+      } catch {
+        return { width: s.length * 8 };
+      }
     },
 
     // Minimal no-op stubs for the frame-label truncation path in
