@@ -619,11 +619,38 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - If linkedom collapses/reorders children, task is reopened with a mitigation plan (manual string injection).
 
 ### E-003 — Round-trip test
-**Status:** `todo` **Deps:** E-001
-**Files:** `tests/js/roundtrip.test.mjs`
+**Status:** `done` **Deps:** E-001
+**Files:** `tests/js/embed-scene-roundtrip.test.mjs`
 **Acceptance:**
 - For each fixture: `__render(scene, { embedScene: true }).svg` → extract base64 → `decodeSvgBase64Payload` from `@excalidraw/excalidraw/data/encode` → deep-equal original `elements` and `files` (ignoring `source` field).
 - Passes for basic, text-wrapped, mixed-script, image, frames fixtures.
+
+**Notes (completion):**
+- Decoder path: **hand-rolled** per upstream `data/encode.ts`. The npm dist
+  of `@excalidraw/excalidraw@0.18.1` ships a single bundled package whose
+  `exports` map only surfaces the root `.` (and types via `./*`) — there is
+  no `./data/encode` subpath, and `decodeSvgBase64Payload` is not re-exported
+  from the root. Pipeline: extract base64 between `<!-- payload-start -->` /
+  `<!-- payload-end -->`; `atob` to wrapper JSON; `JSON.parse`;
+  `wrapper.encoded` is a byte string of the pako-deflated UTF-8 scene JSON
+  (`compressed=true` branch of upstream `decode()`); `Uint8Array.from(…,
+  c => c.charCodeAt(0))`; `pako.inflate(bytes, { to: "string" })`;
+  `JSON.parse` to final `{ type, version, source, elements, appState, files }`.
+- `pako@2.0.3` is reachable via `node_modules/` as a transitive of
+  `@excalidraw/excalidraw` — no new dependency.
+- Assertions deliberately narrowed per task spec and PLAN §11 risk 4:
+  element count, per-index `{id, type}`, and byte-level
+  `JSON.stringify(files)` equality. Full element deep-equal is NOT
+  asserted because upstream `restoreElements` (applied on reopen) fills
+  derived fields — `version`, `versionNonce`, `lineHeight` defaults, etc.
+  — that the hand-authored fixtures do not carry. Those are expected
+  deviations, not regressions.
+- All 5 fixtures (`basic-shapes`, `text-wrapped`, `mixed-script`, `image`,
+  `frames`) round-trip cleanly. `image.excalidraw` exercises the `files`
+  path; the other four have empty-array or empty-object `files` which
+  still compare byte-equal after `JSON.stringify`.
+- `decodePayload(svg)` is exported from the test module so FNT-011 can
+  reuse the decoder verbatim for its font-metadata round-trip gate.
 
 ---
 
