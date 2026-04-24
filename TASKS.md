@@ -282,7 +282,7 @@ the task, and hand off.
 ## T — Phase 2: Text and metrics
 
 ### T-001 — `src/core/text-metrics.mjs` — `FontkitTextMetricsProvider`
-**Status:** `blocked` **Deps:** J-008, FNT-002
+**Status:** `done` **Deps:** J-008, FNT-002
 **Ref:** `PLAN.md` §4A.2
 **Acceptance:**
 - Class exposes `getLineWidth(text, fontString)`.
@@ -291,7 +291,7 @@ the task, and hand off.
 - Unit test: `getLineWidth("Hello", "20px Excalifont") > 0` and within ±20% of the string-length heuristic.
 
 ### T-002 — Font-string parser
-**Status:** `blocked` **Deps:** none
+**Status:** `done` **Deps:** none
 **Files:** inside `src/core/text-metrics.mjs`
 **Acceptance:**
 - `parseFontString("20px Virgil, Segoe UI Emoji")` → `{ pxSize: 20, family: "Virgil" }`.
@@ -299,7 +299,7 @@ the task, and hand off.
 - Unit tests cover at least 6 real scenes' font strings.
 
 ### T-003 — Wire canvas shim to fontkit provider
-**Status:** `blocked` **Deps:** J-005, T-001
+**Status:** `todo` **Deps:** J-005, T-001
 **Ref:** `PLAN.md` §4.2, upstream `SVG_EXPORT.md` §3.2
 **Acceptance:**
 - `document.createElement("canvas").getContext("2d").measureText(text).width` returns the fontkit-measured width for the current `font` string.
@@ -307,7 +307,7 @@ the task, and hand off.
 - Same `FontkitTextMetricsProvider` instance is shared with T-004.
 
 ### T-004 — Register provider via `setCustomTextMetricsProvider`
-**Status:** `blocked` **Deps:** T-001, J-008
+**Status:** `todo` **Deps:** T-001, J-008
 **Ref:** upstream `SVG_EXPORT.md` §3.2
 **Acceptance:**
 - `src/core/index.mjs` imports and calls `setCustomTextMetricsProvider(provider)` from `@excalidraw/element/textMeasurements` once.
