@@ -378,11 +378,23 @@ divergence.
   `@excalidraw/excalidraw/subset/subset-main.ts` loads (which captures
   `typeof Worker` at module evaluation). In the Rust+JS-engine path this is
   automatic (neither rquickjs nor deno_core defines `Worker` by default).
+- `shims/device.mjs` — **F-001 discovery**: `devicePixelRatio` is read at
+  module-eval time by Excalidraw's renderer chunk. Must be pre-installed
+  on `globalThis` before the main entry loads (suggest `globalThis.devicePixelRatio = 1`).
+  Defensive but small.
+- `shims/web-globals.mjs` — **F-002 discovery**: `deno_core`'s default
+  runtime does not provide many Web-platform globals that Deno does.
+  Polyfills required: `URL`, `URLSearchParams`, `TextEncoder`, `TextDecoder`,
+  `Event`, `EventTarget`, `DOMException`, `performance.now()`, `setTimeout`,
+  `clearTimeout`, `setInterval`, `clearInterval`. Polyfill in JS (not via
+  `deno_core` extensions) so Deno and `deno_core` hosts run identical code
+  and the parity gate (R-007) stays meaningful. Cost: ~2–4 KB added to
+  bundle.
 
 Install order, enforced by `shims/install.mjs`:
 
 ```
-dom → base64 → fonts → fetch-fonts → canvas → workers
+device → web-globals → dom → base64 → fonts → fetch-fonts → canvas → workers
 ```
 
 ### 4.3 Font inlining
@@ -682,12 +694,12 @@ pub struct Engine { rt: JsRuntime }
 
 impl Engine {
     pub fn new() -> Self {
-        let mut rt = JsRuntime::new(RuntimeOptions {
-            module_loader: Some(std::rc::Rc::new(deno_core::NoopModuleLoader)),
-            ..Default::default()
-        });
+        let mut rt = JsRuntime::new(RuntimeOptions::default());
 
-        // Bundle is a single-file esbuild output; no module resolution needed.
+        // Classic-script eval of the pre-bundled core.mjs. F-002 discovered
+        // load_main_es_module_from_code swallows synchronous throws; classic
+        // script surfaces errors immediately. J-010 strips `import.meta.*`
+        // via esbuild --define so nothing in the bundle references it.
         rt.execute_script("core.mjs", include_str!(concat!(
             env!("OUT_DIR"), "/core.mjs"
         ))).expect("core.mjs failed to load");
@@ -698,8 +710,8 @@ impl Engine {
     pub async fn render(&mut self, scene: &str, opts: &str)
         -> anyhow::Result<RenderResult>
     {
-        // Trampoline: stash inputs in globals so we don't have to escape them
-        // into a script literal (avoids JSON-in-JS-in-Rust quoting hell).
+        // Trampoline: stash inputs as globals so we don't JSON-escape a
+        // multi-megabyte scene into a script literal.
         let setup = format!(
             "globalThis.__in = {{ scene: {}, opts: {} }}",
             serde_json::to_string(scene)?,
@@ -707,25 +719,33 @@ impl Engine {
         );
         self.rt.execute_script("setup.js", setup)?;
 
-        let call = "globalThis.__render(globalThis.__in.scene, globalThis.__in.opts)";
-        let promise = self.rt.execute_script("call.js", call)?;
-        let resolved = self.rt.resolve_value(promise).await?;
+        let promise = self.rt.execute_script(
+            "call.js",
+            "globalThis.__render(globalThis.__in.scene, globalThis.__in.opts)",
+        )?;
 
-        let scope = &mut self.rt.handle_scope();
+        // deno_core 0.399: resolve_value deprecated. Use resolve + await.
+        let resolved = self.rt.resolve(promise);
+        let resolved = self.rt.with_event_loop_promise(resolved, Default::default()).await?;
+
+        // handle_scope method gone; use the scope! macro.
+        deno_core::scope!(scope, &mut self.rt);
         let local = v8::Local::new(scope, resolved);
-        Ok(serde_v8::from_v8(scope, local)?)
+        Ok(deno_core::serde_v8::from_v8(scope, local)?)
     }
 }
 ```
 
 Notes:
 
-- `NoopModuleLoader` works because we ship one pre-bundled file. If a
-  transitive import survives esbuild's bundle, the build fails at
-  `cargo build` time (module not found), not at runtime.
+- **Classic-script eval, not ES modules.** F-002 finding: the ES-module
+  loader silently swallows synchronous throws. Classic-script eval is
+  safer. Requires esbuild to strip `import.meta.*` via `--define`.
+- No custom `module_loader`: the bundle is self-contained, no imports
+  at runtime. If esbuild leaks an unresolved import, build fails fast.
 - All I/O lives on the Rust side. JS never touches the filesystem.
-- No `op` bindings in v1 — string-eval + JSON bridge is enough. Add ops
-  later if we want streaming or progress callbacks.
+- No `op` bindings in v1 — string-eval + JSON bridge is enough.
+- **deno_core 0.399.0 pinned** (PHASE0.md §2). `serde_v8` is re-exported.
 
 ### 5.3 `main.rs` — argv + I/O
 
@@ -857,16 +877,33 @@ editor by default. Mitigations, in order of leverage:
 1. **Import only what we need.** If Phase 0 finds a deep sub-path in the
    dist that exposes `exportToSvg` cleanly, use that. Otherwise, use the
    package root and rely on steps 2–4.
-2. **Stub React and the editor at bundle time** via esbuild aliases:
+2. **Stub React and the editor at bundle time** via esbuild aliases.
+   **F-001 finding: the PLAN's original alias list is necessary but not
+   sufficient.** The actual list that survived the spike:
    ```js
    alias: {
-     "react":            "./stubs/empty.mjs",
-     "react-dom":        "./stubs/empty.mjs",
-     "react-dom/client": "./stubs/empty.mjs",
-     "jotai":            "./stubs/empty.mjs",
+     "react":                           "./stubs/proxy.mjs",
+     "react-dom":                       "./stubs/proxy.mjs",
+     "react-dom/client":                "./stubs/proxy.mjs",
+     "react/jsx-runtime":               "./stubs/proxy.mjs",
+     "react/jsx-dev-runtime":           "./stubs/proxy.mjs",
+     "jotai":                           "./stubs/proxy.mjs",
+     "jotai-scope":                     "./stubs/proxy.mjs",
+     "@excalidraw/mermaid-to-excalidraw":"./stubs/proxy.mjs",
    },
+   // Catch-all for the Radix family (wildcard not supported by alias;
+   // use an esbuild plugin to resolve `^@radix-ui/` → stubs/proxy.mjs).
    loader: { ".css": "empty" },
    ```
+   The stub must be a **callable `Proxy`**, not `{}` or `noop`. Downstream
+   code uses `Object.assign(imported, {...})` and destructuring on imported
+   symbols; a plain object breaks both. See `spike/README.md` for the
+   working Proxy implementation.
+
+   Additionally, **mark the 54 `dist/prod/locales/*.js` dynamic imports
+   as external** (or alias to `proxy.mjs`). They're loaded via dynamic
+   import inside Excalidraw's i18n code path and survive static
+   tree-shaking; excluding them saves ~1.7 MB.
 3. **esbuild flags for maximum dead-code elimination**:
    ```
    --minify

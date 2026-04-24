@@ -122,17 +122,32 @@ the task, and hand off.
 ## J — Phase 1: JS core minimal happy path (no text)
 
 ### J-001 — `src/core/shims/dom.mjs`
-**Status:** `blocked` **Deps:** P-002, F-001
-**Ref:** `PLAN.md` §4.2, upstream `SVG_EXPORT.md` §3.1, §4
+**Status:** `todo` **Deps:** P-002, F-001 (both `done`)
+**Ref:** `PLAN.md` §4.2, upstream `SVG_EXPORT.md` §3.1, §4, `PHASE0.md` §"Finding C"
 **Acceptance:**
 - Installs linkedom `window`, `document`, `Node`, `Element`, `HTMLElement`, `SVGElement`, `DocumentFragment` on `globalThis`.
+- Also sets `globalThis.devicePixelRatio = 1` **before** the return — F-001 finding: Excalidraw's renderer chunk reads `devicePixelRatio` at module-eval time. (Kept inside the DOM shim rather than a separate file because it's a one-liner and logically "environmental window globals.")
 - Unit test: creates `<svg xmlns="…">`, appends a `<rect>` with `setAttributeNS`, asserts `outerHTML` round-trips the namespace.
+- Unit test: after importing, `typeof globalThis.devicePixelRatio === "number"` and equals 1.
 
-### J-002 — `src/core/shims/base64.mjs`
+### J-002 — `src/core/shims/web-globals.mjs` (EXPANDED per F-002)
 **Status:** `blocked` **Deps:** J-001
+**Ref:** `PHASE0.md` §"Finding B", `PLAN.md` §4.2
 **Acceptance:**
-- `window.btoa`/`window.atob` work on Latin-1 strings without Node's `Buffer` global (use `Uint8Array` + `atob`/`btoa` polyfill or `TextEncoder`).
-- Unit test: `btoa("hello") === "aGVsbG8="`; `atob(btoa("héllo"))` round-trips as binary bytes.
+- File renamed from `base64.mjs` to `web-globals.mjs` — F-002 discovered `deno_core` lacks many Web-platform globals that Deno silently provides. This shim now covers the full set.
+- Installs on both `window` and `globalThis`:
+  - `btoa`, `atob` — `btoa("hello") === "aGVsbG8="`; `atob(btoa("héllo"))` round-trips.
+  - `URL`, `URLSearchParams` — `new URL("https://a/b?c=1").searchParams.get("c") === "1"`.
+  - `TextEncoder`, `TextDecoder` — round-trip non-ASCII.
+  - `Event`, `EventTarget` — minimal spec, `addEventListener` + `dispatchEvent` functional.
+  - `DOMException` — constructor accepts `(message, name)`.
+  - `performance.now()` — monotonic numeric.
+  - `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval` — use host-provided if present (deno_core's timer ops work); polyfill only the missing ones.
+- **Single JS source of truth**: polyfill in JS, NOT via `deno_core` extensions. The parity gate (R-007) requires Deno and `deno_core` to run identical code.
+- Reuse third-party polyfill code (`event-target-shim`, small TextEncoder polyfills) where it bundles cleanly with esbuild `--platform=neutral`. Budget: ≤5 KB added to minified bundle.
+- Unit test covers each of the above.
+
+**Agent notes:** Start from `spike-rust/src/polyfills.js` (the minimum set F-002 proved necessary). Expand to the full list. Also update `PLAN.md` §7 repo-layout to rename the shim file.
 
 ### J-003 — `src/core/shims/fonts.mjs`
 **Status:** `blocked` **Deps:** J-001
@@ -168,11 +183,12 @@ the task, and hand off.
 
 ### J-007 — `src/core/shims/install.mjs`
 **Status:** `blocked` **Deps:** J-001..J-006
-**Ref:** `PLAN.md` §4.2
+**Ref:** `PLAN.md` §4.2 (updated install order), `PHASE0.md` Findings B+C
 **Acceptance:**
-- Imports in order: `dom`, `base64`, `fonts`, `fetch-fonts`, `canvas`, `workers`.
+- Imports in order: `dom` (sets devicePixelRatio + linkedom window/document), `web-globals` (URL, TextEncoder, Event, etc. — renamed from base64), `fonts` (FontFace + document.fonts), `fetch-fonts` (requires FNT-002 done), `canvas` (createElement wrapper), `workers` (Worker=undefined).
 - Side-effect-only; no exports.
 - Unit test: importing once installs all shims; importing again is a no-op (idempotent).
+- Unit test: after install, each shim's signature globals are present (`document`, `URL`, `FontFace`, `fetch`, `HTMLCanvasElement`, `typeof Worker === "undefined"`).
 
 ### J-008 — `src/core/index.mjs` — `__render` entry
 **Status:** `blocked` **Deps:** J-007
