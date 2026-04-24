@@ -473,7 +473,7 @@ the task, and hand off.
 ## I — Phase 4: Images and frames
 
 ### I-001 — Image fixture (dataURL)
-**Status:** `blocked` **Deps:** P-003
+**Status:** `done` **Deps:** P-003
 **Files:** `tests/fixtures/image.excalidraw`
 **Acceptance:** Contains a PNG image element with `dataURL` in `files`. Opens cleanly on excalidraw.com.
 
