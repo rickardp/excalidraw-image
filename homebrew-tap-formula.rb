@@ -1,0 +1,64 @@
+# Homebrew formula stub for `excalidraw-image`.
+#
+# This file is a TEMPLATE. The release workflow (`.github/workflows/release.yml`,
+# `homebrew-pr` job) renders it with concrete values via `sed`, then opens
+# a PR against `rickardp/homebrew-tap` (REL-004 — that tap repo must be
+# created manually before the PR step works).
+#
+# Placeholders rendered by the workflow:
+#   @@VERSION@@           the released version (no leading `v`)
+#   @@URL_DARWIN_ARM@@    full GH Releases URL for aarch64-apple-darwin tarball
+#   @@SHA_DARWIN_ARM@@    sha256 of that tarball
+#   @@URL_DARWIN_X86@@    full GH Releases URL for x86_64-apple-darwin tarball
+#   @@SHA_DARWIN_X86@@    sha256 of that tarball
+#   @@URL_LINUX_X86@@     full GH Releases URL for x86_64-unknown-linux-gnu tarball
+#   @@SHA_LINUX_X86@@     sha256 of that tarball
+#
+# Linux ARM64 is not yet shipped (see PHASE0.md and release.yml header).
+# Add an `on_arm` block here and a matching matrix entry in release.yml when
+# that lands.
+
+class ExcalidrawImage < Formula
+  desc "Convert Excalidraw files to SVG/PNG (self-contained native binary)"
+  homepage "https://github.com/rickardp/excalidraw-svg-export"
+  version "@@VERSION@@"
+  license "MIT"
+
+  on_macos do
+    on_arm do
+      url "@@URL_DARWIN_ARM@@"
+      sha256 "@@SHA_DARWIN_ARM@@"
+    end
+    on_intel do
+      url "@@URL_DARWIN_X86@@"
+      sha256 "@@SHA_DARWIN_X86@@"
+    end
+  end
+
+  on_linux do
+    on_intel do
+      url "@@URL_LINUX_X86@@"
+      sha256 "@@SHA_LINUX_X86@@"
+    end
+    # on_arm: deferred — see release.yml notes on Linux ARM64.
+  end
+
+  def install
+    bin.install "excalidraw-image"
+  end
+
+  test do
+    fixture = (testpath/"basic.excalidraw")
+    fixture.write <<~JSON
+      {"type":"excalidraw","version":2,"source":"https://excalidraw.com",
+       "elements":[{"type":"rectangle","id":"a","x":0,"y":0,
+       "width":100,"height":50,"strokeColor":"#000","backgroundColor":"transparent",
+       "fillStyle":"solid","strokeWidth":1,"strokeStyle":"solid","roughness":1,
+       "opacity":100,"angle":0,"seed":1,"version":1,"versionNonce":1,
+       "isDeleted":false,"groupIds":[],"frameId":null,"roundness":null,
+       "boundElements":null,"updated":0,"link":null,"locked":false}],
+       "appState":{"viewBackgroundColor":"#ffffff"},"files":{}}
+    JSON
+    assert_match "<svg", shell_output("#{bin}/excalidraw-image #{fixture}")
+  end
+end

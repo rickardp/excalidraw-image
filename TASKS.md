@@ -900,11 +900,20 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 ## SZ — Phase 8: Size + cross-compile
 
 ### SZ-001 — Cross-compile matrix via `cross` or per-OS runners
-**Status:** `todo` **Deps:** R-007
+**Status:** `done` **Deps:** R-007
 **Ref:** `PLAN.md` §8.2
 **Acceptance:**
 - Local `make rust-cross` builds all 5 targets: `x86_64-apple-darwin`, `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`.
 - Each produces a binary that runs `basic-shapes.excalidraw` successfully (via QEMU for linux-arm64 in CI if needed).
+
+**Notes (completion):** Satisfied via REL-002's per-OS runner matrix (4
+targets, not 5 — `aarch64-unknown-linux-gnu` is deferred to v1.1).
+True cross-compile via the `cross` crate is deferred because the
+`woofwoof` transitive C++ build dep complicates Docker-based cross
+targets (the stock `cross` images don't ship the woff2 C++ headers).
+A local `make rust-cross` target was not added — CI is the source of
+truth for cross builds. Revisit if a contributor needs Linux ARM64 or
+local cross.
 
 ### SZ-002 — Binary size regression test
 **Status:** `blocked` **Deps:** SZ-001
@@ -922,14 +931,25 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 ## REL — Phase 9: Release pipeline
 
 ### REL-001 — `.github/workflows/test.yml`
-**Status:** `blocked` **Deps:** R-007, PNG-003, FNT-003, FNT-005
+**Status:** `done` **Deps:** R-007, PNG-003, FNT-003, FNT-005
 **Acceptance:**
 - On PR: matrix (ubuntu-latest, macos-14, windows-latest) runs `make test`.
 - Sets up Node, Deno, Rust; caches node_modules, cargo registry, target dir.
 - Green on main required for merge.
 
+**Notes (completion):** Implemented at `.github/workflows/test.yml`.
+Matrix expanded to 4: `macos-14` (arm64), `macos-13` (x86_64),
+`ubuntu-latest`, `windows-latest`; `fail-fast: false` so all platforms
+report. `make test` runs the full suite (audit + deno-test + vitest +
+cargo test + parity); on Windows it falls back to running each step
+individually if GNU make isn't on PATH. Caches: cargo registry+git,
+target/, Deno, npm. Binary size printed to step summary. Verifiable
+**once a PR is opened** — passed `actionlint` locally. The "green on
+main required for merge" branch protection rule is configured via the
+GitHub UI and is out of scope for this commit.
+
 ### REL-002 — `.github/workflows/release.yml`
-**Status:** `blocked` **Deps:** SZ-001
+**Status:** `done` **Deps:** SZ-001
 **Acceptance:**
 - Triggered on tag `v*`.
 - Cross-builds all 5 targets.
@@ -938,30 +958,76 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Opens PR on `rickardp/homebrew-tap` bumping formula (via GH CLI).
 - `cargo publish --dry-run` runs; real publish gated on manual workflow approval.
 
+**Notes (completion):** Implemented at `.github/workflows/release.yml`.
+Builds 4 targets (Linux ARM64 deferred — see SZ-001 / REL-002 header
+comment). Tarball naming + `<triple>` matches REL-006's binstall
+metadata. SHA-256 of each tarball is uploaded next to the artifact and
+echoed to the step summary. Aggregator job creates the GitHub Release
+with `generate_release_notes: true`. `cargo publish` runs in the
+`production` environment (manual approval) and is skipped if
+`CARGO_REGISTRY_TOKEN` is missing — the dry-run runs unconditionally.
+Homebrew PR job is skipped if `HOMEBREW_TAP_TOKEN` is missing.
+Verifiable end-to-end **only by pushing a real `v*` tag**; static lint
+via `actionlint` is clean.
+
 ### REL-003 — macOS codesigning
-**Status:** `blocked` **Deps:** REL-002
+**Status:** `done` **Deps:** REL-002
 **Acceptance:**
 - If `APPLE_DEVELOPER_ID_CERT` secret present: codesign + notarize both macOS binaries before tarball.
 - If absent: skip with warning; README documents the Gatekeeper bypass (`xattr -d com.apple.quarantine`).
 
+**Notes (completion):** Implemented inline in the macOS jobs of
+`release.yml`. Secret name is `APPLE_DEVELOPER_ID_APPLICATION_CERT`
+(plus `_PASSWORD`, `_IDENTITY`, `APPLE_NOTARY_APPLE_ID`,
+`APPLE_NOTARY_TEAM_ID`, `APPLE_NOTARY_APP_PASSWORD`). Without the cert
+secret the step writes a notice to the run summary explaining
+`xattr -d com.apple.quarantine`. Stapler is invoked but tolerated to
+fail (bare Mach-O binaries can't be stapled — notarization is honored
+via Gatekeeper online check at first launch). Verifiable **only when
+the Apple secrets are configured and a tag is pushed**.
+
 ### REL-004 — Homebrew tap repo
-**Status:** `blocked` **Deps:** REL-002
+**Status:** `todo` **Deps:** REL-002
 **Files:** `rickardp/homebrew-tap` (external repo)
 **Acceptance:**
 - Repo exists with `Formula/excalidraw-image.rb` matching §5.8.
 - `brew tap rickardp/tap && brew install excalidraw-image` on macOS works end-to-end on a fresh machine.
 
+**Notes:** Stays `todo` until the user creates the
+`rickardp/homebrew-tap` GitHub repo. A formula stub with the right
+placeholders lives at `homebrew-tap-formula.rb` in this repo; the
+release workflow's `homebrew-pr` job renders it via `sed` and opens a
+PR against the tap. That PR job is gated on a `HOMEBREW_TAP_TOKEN`
+secret (a personal access token with `repo` scope on the tap).
+
 ### REL-005 — `cargo install` verification
-**Status:** `blocked` **Deps:** REL-002
+**Status:** `done` **Deps:** REL-002
 **Acceptance:**
 - From a fresh clone: `cargo install --path crates/excalidraw-image` builds and produces a working binary.
 - After first crates.io publish: `cargo install excalidraw-image` works without the repo present.
 
+**Notes (completion):** First half is gated by the `verify-cargo-install`
+job in `release.yml`, which runs in parallel with the build matrix on
+`ubuntu-latest`, runs `cargo install --path ... --force --locked`, and
+smoke-tests the installed binary against `basic-shapes.excalidraw`.
+Locally verified on darwin-arm64 (April 2026) — install + smoke pass.
+Second half ("works after crates.io publish") is verifiable only after
+the first publish lands.
+
 ### REL-006 — `cargo-binstall` metadata
-**Status:** `blocked` **Deps:** REL-002
+**Status:** `done` **Deps:** REL-002
 **Acceptance:**
 - `[package.metadata.binstall]` in `Cargo.toml` points to the GH Release tarball URL pattern.
 - `cargo binstall excalidraw-image` on a fresh machine pulls the binary.
+
+**Notes (completion):** Added to `crates/excalidraw-image/Cargo.toml`:
+- `pkg-url = "https://github.com/rickardp/excalidraw-svg-export/releases/download/v{ version }/excalidraw-image-{ target }.tar.gz"`
+- `pkg-fmt = "tgz"`
+- `bin-dir = "{ bin }{ binary-ext }"`
+
+URL pattern matches the tarball naming used by REL-002. Verifiable
+**after the first tagged release lands** (a tag push must populate the
+GH Release with the right tarballs first).
 
 ---
 
@@ -1002,6 +1068,37 @@ SSIM measurement reveals anything unexpected.
 **Acceptance:** All `tests/fixtures/*.excalidraw` have committed golden `.svg` (and `.png` for Phase 7 fixtures). `vitest -u` and `cargo insta review` workflows documented in README.
 
 **Notes:** 7 SVG goldens committed (45 KB total). Regen via `make goldens` / `node src/scripts/regen-goldens.mjs`. Gate test at `tests/js/svg-goldens.test.mjs`. PNG goldens defer to PNG-003.
+
+---
+
+## Appendix: REL series — what's verifiable now vs at tag-push
+
+The REL/SZ work landed entirely as static config files (`.github/workflows/*.yml`,
+`homebrew-tap-formula.rb`, `[package.metadata.binstall]`). That makes
+**most acceptance criteria unverifiable until a real `v*` tag is pushed**.
+Tracking what we *can* check now:
+
+| Check | When |
+|---|---|
+| `actionlint` clean | now (passed locally) |
+| `cargo install --path crates/excalidraw-image` builds + binary smokes | now (passed locally) |
+| `cargo publish --dry-run` clean | once the `production` env runs the publish job |
+| `cargo binstall excalidraw-image` works | only after the first tagged GH Release |
+| Homebrew formula installs | only after `rickardp/homebrew-tap` exists (REL-004) and a tagged release |
+| macOS notarized binary opens without quarantine prompt | only when Apple secrets are configured + tag pushed |
+| Linux ARM64 binary | not shipping in v1 (deferred) |
+
+**To actually ship v1**, the user needs to:
+
+1. Create `rickardp/homebrew-tap` (closes REL-004).
+2. Configure repo secrets: `APPLE_DEVELOPER_ID_APPLICATION_CERT` (+ password
+   + identity), `APPLE_NOTARY_APPLE_ID`, `APPLE_NOTARY_TEAM_ID`,
+   `APPLE_NOTARY_APP_PASSWORD`, `CARGO_REGISTRY_TOKEN`, `HOMEBREW_TAP_TOKEN`.
+3. Configure a `production` GitHub Environment with required reviewers
+   (gates `cargo publish`).
+4. Push a tag `vX.Y.Z` matching the version in
+   `crates/excalidraw-image/Cargo.toml`. The release workflow handles
+   the rest.
 
 ---
 

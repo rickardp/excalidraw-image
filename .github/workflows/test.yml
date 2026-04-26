@@ -1,0 +1,133 @@
+# REL-001 — CI on every PR + push to main.
+#
+# Per-OS native runners (no cross-compile). The woofwoof transitive C++
+# build dep would complicate Docker-based cross targets; see release.yml
+# header for the same rationale.
+#
+# Linux ARM64 is intentionally absent here — see release.yml. Adding it
+# requires either QEMU under linux-arm64 runners or `cross`, both of which
+# need extra C++ toolchain plumbing for woofwoof. Deferred to v1.1.
+
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref. Releases use a separate workflow
+# so this won't cancel a tag build.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            label: aarch64-apple-darwin
+          - os: macos-13
+            label: x86_64-apple-darwin
+          - os: ubuntu-latest
+            label: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            label: x86_64-pc-windows-msvc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Deno 2.x
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v2.x
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry + git
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+
+      - name: Cache cargo target
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: cargo-target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', 'crates/**/build.rs') }}
+          restore-keys: |
+            cargo-target-${{ runner.os }}-
+
+      - name: Cache Deno
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.deno
+            ~/.cache/deno
+            ~/Library/Caches/deno
+            ~\AppData\Local\deno
+          key: deno-${{ runner.os }}-${{ hashFiles('deno.lock') }}
+          restore-keys: |
+            deno-${{ runner.os }}-
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Build dist/core.mjs
+        run: make core
+
+      - name: Run tests (vitest + cargo + parity + audit + deno-test)
+        # `make test` already chains: audit, deno-test, vitest, cargo test, parity.
+        # On Windows GNU make may not be present; fall back to running the
+        # individual targets. Both branches must keep parity gate active.
+        shell: bash
+        run: |
+          if command -v make >/dev/null 2>&1; then
+            make test
+          else
+            echo "GNU make not found; running test steps individually"
+            npm run audit
+            deno test --allow-read tests/deno/
+            npx vitest run --passWithNoTests
+            cargo test
+            cargo test -p excalidraw-image --release --test parity
+          fi
+
+      - name: Print binary size
+        shell: bash
+        run: |
+          # Release binary lives at target/release/excalidraw-image[.exe].
+          # `make test` doesn't necessarily produce a release build, so build
+          # one quickly for the size print. Cached target/ keeps this fast.
+          cargo build --release -p excalidraw-image
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            BIN=target/release/excalidraw-image.exe
+          else
+            BIN=target/release/excalidraw-image
+          fi
+          ls -lh "$BIN"
+          if command -v stat >/dev/null 2>&1; then
+            # macOS uses `stat -f%z`, GNU stat uses `stat -c%s`.
+            SIZE=$(stat -f%z "$BIN" 2>/dev/null || stat -c%s "$BIN")
+            echo "binary_size_bytes=$SIZE" >> "$GITHUB_OUTPUT" || true
+            echo "Binary size on ${{ matrix.label }}: $SIZE bytes" >> "$GITHUB_STEP_SUMMARY"
+          fi

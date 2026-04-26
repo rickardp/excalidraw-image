@@ -54,3 +54,13 @@ woofwoof = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
+
+# REL-006 — cargo-binstall metadata. Must match the tarball naming used by
+# `.github/workflows/release.yml` (`excalidraw-image-<target>.tar.gz` with
+# the binary at the archive root). `pkg-url` uses cargo-binstall template
+# tokens: { version }, { target }, { archive-format }, { binary-ext },
+# { bin }.
+[package.metadata.binstall]
+pkg-url = "https://github.com/rickardp/excalidraw-svg-export/releases/download/v{ version }/excalidraw-image-{ target }.tar.gz"
+pkg-fmt = "tgz"
+bin-dir = "{ bin }{ binary-ext }"
