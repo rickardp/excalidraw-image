@@ -968,7 +968,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 ## D — Phase 10: Docs and polish
 
 ### D-001 — README
-**Status:** `blocked` **Deps:** R-007, PNG-002
+**Status:** `done` **Deps:** R-007, PNG-002
 **Files:** `README.md`
 **Acceptance:**
 - Install section: `brew install`, `cargo install`, GH Release download.
@@ -984,9 +984,18 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 **Notes:** EXAMPLES section added in argv.rs covering stdout, file output, format inference, embed-scene round-trip, scale+max, stdin pipe.
 
 ### D-003 — Fidelity caveats doc
-**Status:** `blocked` **Deps:** FNT-005, PNG-004
+**Status:** `done` **Deps:** FNT-005, PNG-004
 **Files:** `docs/fidelity.md`
 **Acceptance:** Documents expected divergences from web-app output and why. Links to relevant PLAN sections.
+
+**Notes (completion):** Landed without waiting for PNG-004 to ship. PNG
+fidelity is documented as authoritative-as-of-today: text wrapping is
+exact (SVG already has one `<text>` per wrapped line), but glyph
+horizontal-advance through `resvg` may sub-pixel-drift from a
+Chromium-rendered SVG. The PNG-004 SSIM ≥ 0.95 gate is listed under "Known
+issues / open follow-ups" so the doc is honest about what is and isn't
+locked yet. Re-visit when PNG-004 lands and tighten the language if the
+SSIM measurement reveals anything unexpected.
 
 ### D-004 — Fixture snapshot baseline
 **Status:** `done` **Deps:** R-007
