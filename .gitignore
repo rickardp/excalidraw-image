@@ -5,6 +5,17 @@ target/
 # Dependency directories
 node_modules/
 
+# Bundled fonts populated from node_modules/@excalidraw/excalidraw at build
+# time by `npm run sync-fonts`. These directories are deliberately not
+# checked in — the upstream npm package + integrity-pinned package-lock.json
+# is the single source of truth. See src/scripts/sync-fonts.mjs.
+crates/excalidraw-image-fonts-*/fonts/
+
+# Mirrored bundle used by `cargo publish` for the main crate. Regenerated
+# by `make core` (src/scripts/build-core.mjs); never committed so it
+# can't go stale relative to the source.
+crates/excalidraw-image/assets/core.mjs
+
 # Environment files
 .env
 .env.*

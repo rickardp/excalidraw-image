@@ -1,5 +1,5 @@
 [package]
-name = "excalidraw-image-fonts-core"
+name = "excalidraw-image-fonts-cjk-extra"
 # NOT workspace-inherited. Starts at 1.0.0 since the bundled-fonts API
 # (a single `pub static FONTS: &[(&str, &[u8])]` table) is stable; only
 # the woff2 contents will ever change. Patch is auto-bumped by
@@ -8,7 +8,7 @@ name = "excalidraw-image-fonts-core"
 version = "1.0.0"
 edition = "2021"
 license = "MIT"
-description = "Bundled Latin-script fonts for excalidraw-image"
+description = "Bundled long-tail CJK fonts (Xiaolai — CJK Ext A + Compat Ideographs) for excalidraw-image"
 repository = "https://github.com/rickardp/excalidraw-image"
 homepage = "https://github.com/rickardp/excalidraw-image"
 authors = ["Rickard"]
@@ -26,8 +26,8 @@ include = [
 # SHA-256 of (sorted relative path + ":" + sha256-hex of contents) lines, joined by "\n".
 # Verified by `npm run check:fonts`. Update this manually when fonts change,
 # alongside a version bump.
-sha256 = "7375a2660e84bd94f720b62ec8b2364bdf0646955013bb91bb100937416a8965"
-file_count = 25
+sha256 = "023c933b9a01e3b09cc6d8f58dbb7c9aaf6376086290338814ffa1e51c1a8a61"
+file_count = 44
 
 [lib]
 path = "src/lib.rs"

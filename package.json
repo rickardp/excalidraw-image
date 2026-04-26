@@ -12,6 +12,7 @@
     "build": "node src/scripts/build-core.mjs",
     "audit": "node src/scripts/metafile-audit.mjs",
     "check:fonts": "node src/scripts/check-font-fingerprints.mjs",
+    "sync-fonts": "node src/scripts/sync-fonts.mjs",
     "baseline:fonts": "node src/scripts/browser-font-baseline.mjs",
     "test:snapshot:update": "echo 'T-006: regenerate tests/fixtures/text-wrapped.expected.json by running the capture driver. Manual for now; the full baseline-update workflow lands with FNT-005 (Playwright oracle).' && exit 1"
   },

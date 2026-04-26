@@ -92,6 +92,12 @@ jobs:
       - name: npm ci
         run: npm ci
 
+      - name: Sync bundled fonts from node_modules
+        # crates/excalidraw-image-fonts-*/fonts/ is gitignored; populate
+        # it from the @excalidraw/excalidraw npm package before any cargo
+        # build/test step. See src/scripts/sync-fonts.mjs.
+        run: npm run sync-fonts
+
       - name: Build dist/core.mjs
         run: make core
 
@@ -110,7 +116,7 @@ jobs:
             deno test --allow-read tests/deno/
             npx vitest run --passWithNoTests
             cargo test
-            cargo test -p excalidraw-image --release --features cjk --test parity
+            cargo test -p excalidraw-image --release --features cjk-full --test parity
           fi
 
       - name: Print binary size

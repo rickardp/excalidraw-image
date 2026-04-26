@@ -101,15 +101,16 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install JS deps
         run: npm ci
-      - name: Build dist/core.mjs
+      - name: Sync bundled fonts from node_modules
+        # crates/excalidraw-image-fonts-*/fonts/ is gitignored; populate
+        # before publish so the .crate tarballs include the woff2s.
+        run: npm run sync-fonts
+      - name: Build dist/core.mjs (mirrors to crates/excalidraw-image/assets/)
+        # `make core` runs build-core.mjs which writes dist/core.mjs and
+        # mirrors a copy to crates/excalidraw-image/assets/core.mjs for
+        # `cargo publish`. The mirror is gitignored — regenerated on every
+        # build so it can't go stale.
         run: make core
-      - name: Mirror core.mjs into crate assets/
-        # `cargo publish` only packages files inside the crate dir.
-        # PLAN.md §5.9: commit a mirror so the published crate is
-        # self-contained on crates.io.
-        run: |
-          mkdir -p crates/excalidraw-image/assets
-          cp dist/core.mjs crates/excalidraw-image/assets/core.mjs
       - name: Verify font fingerprints
         # Catches drift: fonts changed but version + recorded fingerprint not
         # bumped. Fails fast before any publish runs.
@@ -123,7 +124,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for c in excalidraw-image-fonts-core excalidraw-image-fonts-cjk; do
+          for c in excalidraw-image-fonts-core excalidraw-image-fonts-cjk excalidraw-image-fonts-cjk-extra; do
             echo "::group::publish $c"
             set +e
             out=$(cargo publish -p "$c" --allow-dirty --locked 2>&1)
@@ -211,12 +212,20 @@ jobs:
           key: ${{ matrix.target }}
       - name: Install JS deps
         run: npm ci
+      - name: Sync bundled fonts from node_modules
+        # crates/excalidraw-image-fonts-*/fonts/ is gitignored; populate
+        # before cargo build so include_bytes! finds the woff2s.
+        run: npm run sync-fonts
       - name: Build dist/core.mjs
         run: make core
       - name: Build binary
+        # Ship `cjk-full` in prebuilt binaries so Homebrew/GH-Releases users
+        # get every Xiaolai shard (common + long-tail) without having to
+        # know about cargo features. `cargo install` users still default to
+        # Latin-only and can opt into `cjk` or `cjk-full` themselves.
         shell: bash
         run: |
-          cargo build --release --target ${{ matrix.target }} -p excalidraw-image
+          cargo build --release --target ${{ matrix.target }} -p excalidraw-image --features cjk-full
       - name: Package archive
         shell: bash
         run: |

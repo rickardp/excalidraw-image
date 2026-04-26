@@ -514,6 +514,7 @@ dependencies = [
  "anyhow",
  "deno_core",
  "excalidraw-image-fonts-cjk",
+ "excalidraw-image-fonts-cjk-extra",
  "excalidraw-image-fonts-core",
  "lexopt",
  "resvg",
@@ -527,11 +528,15 @@ dependencies = [
 
 [[package]]
 name = "excalidraw-image-fonts-cjk"
-version = "0.1.0"
+version = "1.0.0"
+
+[[package]]
+name = "excalidraw-image-fonts-cjk-extra"
+version = "1.0.0"
 
 [[package]]
 name = "excalidraw-image-fonts-core"
-version = "0.1.0"
+version = "1.0.0"
 
 [[package]]
 name = "fdeflate"

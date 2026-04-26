@@ -25,7 +25,12 @@ help:
 	@echo "Run 'make <target>' to invoke one."
 
 bootstrap:
-	npm ci && cargo fetch && deno cache src/core/dev.mjs
+	npm ci
+	# Populate crates/excalidraw-image-fonts-*/fonts/ from node_modules.
+	# Those dirs are gitignored — see src/scripts/sync-fonts.mjs.
+	npm run sync-fonts
+	cargo fetch
+	deno cache src/core/dev.mjs
 
 core:
 	node src/scripts/build-core.mjs
@@ -51,10 +56,11 @@ rust:
 # compares stdout byte-for-byte. Depends on `core` because both hosts load
 # `dist/core.mjs`.
 parity: core
-	# `--features cjk` so the Rust side has the Xiaolai fonts loaded,
-	# matching what Deno's dev path reads from node_modules. Without cjk,
-	# the mixed-script fixture diverges (Rust omits CJK glyphs).
-	cargo test -p excalidraw-image --release --features cjk --test parity
+	# `--features cjk-full` so the Rust side has every Xiaolai shard
+	# loaded (common + long-tail), matching what Deno's dev path reads
+	# from node_modules. With only `cjk` (165 shards) Rust would diverge
+	# on any fixture that hits CJK Ext A or compatibility ideographs.
+	cargo test -p excalidraw-image --release --features cjk-full --test parity
 
 # J-011: CI gate against forbidden imports in dist/core.mjs. Requires a
 # fresh dist/meta.json, so build core first.

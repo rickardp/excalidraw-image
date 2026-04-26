@@ -30,7 +30,7 @@
 //   path doesn't expose `import.meta`, so the bundle must not contain any.
 
 import { build } from "esbuild";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -40,6 +40,15 @@ const stubPath = path.join(repoRoot, "src/core/stubs/proxy.mjs");
 const entry = path.join(repoRoot, "src/core/index.mjs");
 const outfile = path.join(repoRoot, "dist/core.mjs");
 const metafilePath = path.join(repoRoot, "dist/meta.json");
+// Mirror copy used by `cargo publish` for the main crate. assets/core.mjs is
+// .gitignored — we regenerate it on every `make core` so it can never go
+// stale relative to dist/core.mjs. The main crate's build.rs falls back to
+// this path when dist/core.mjs is missing (e.g., inside a published .crate
+// tarball where dist/ doesn't ship).
+const assetsMirror = path.join(
+  repoRoot,
+  "crates/excalidraw-image/assets/core.mjs",
+);
 
 const pkg = JSON.parse(
   readFileSync(path.join(repoRoot, "package.json"), "utf8"),
@@ -115,6 +124,11 @@ const result = await build({
 mkdirSync(path.dirname(metafilePath), { recursive: true });
 writeFileSync(metafilePath, JSON.stringify(result.metafile, null, 2));
 
+// Mirror dist/core.mjs into the main crate's assets/ so `cargo publish`
+// has it available without needing make core to have run separately.
+mkdirSync(path.dirname(assetsMirror), { recursive: true });
+copyFileSync(outfile, assetsMirror);
+
 const outKey = path.relative(repoRoot, outfile);
 const bytes = result.metafile.outputs[outKey]?.bytes;
 const warnings = result.warnings.length;
@@ -122,4 +136,7 @@ const warnings = result.warnings.length;
 console.log(
   `[build-core] wrote dist/core.mjs (${bytes ?? "?"} bytes)` +
     (warnings ? ` with ${warnings} warnings` : ""),
+);
+console.log(
+  `[build-core] mirrored to crates/excalidraw-image/assets/core.mjs`,
 );

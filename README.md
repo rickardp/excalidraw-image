@@ -27,8 +27,26 @@ from [GitHub Releases](https://github.com/rickardp/excalidraw-image/releases).
 ### Cargo
 
 ```
-cargo install excalidraw-image
+cargo install excalidraw-image                  # Latin-only (~48 MB binary)
+cargo install excalidraw-image --features cjk       # + modern CJK (~78 MB)
+cargo install excalidraw-image --features cjk-full  # + long-tail CJK (~83 MB)
 ```
+
+The default build bundles only Latin-script fonts to keep the install fast
+and the binary small. Pick a CJK tier based on what your scenes contain:
+
+- **`cjk`** — modern Chinese, Japanese kanji, Korean Hangul Syllables,
+  and common CJK punctuation. The right choice for almost everyone who
+  renders CJK text day-to-day.
+- **`cjk-full`** — implies `cjk`, plus CJK Extension A
+  (classical/historical ideographs, scholarly texts, dialect-specific
+  terms), CJK Compatibility Ideographs, CJK Radicals, and Hangul Jamo.
+  Pick this if you render classical Chinese, philological texts, or
+  obscure surnames.
+
+The Homebrew formula and prebuilt binaries on GitHub Releases ship with
+`cjk-full` enabled, so users on those channels never need to think about
+the feature flags.
 
 Not yet on crates.io; this becomes the supported path once
 [REL-005](TASKS.md) ships. Until then,

@@ -368,14 +368,16 @@ fn prepare_core(src: &str) -> String {
 ///
 /// `fetch-fonts.mjs` and `text-metrics.mjs` look up byte payloads from this
 /// global at render time. Bytes are copied into V8-managed memory once at
-/// engine construction (~12 MB for Latin core, ~12 MB more if `cjk` feature
-/// is on). The shape mirrors what Deno's `dev.mjs` populates from disk so
-/// the parity gate stays meaningful.
+/// engine construction (~0.4 MB Latin core, ~9 MB more with `cjk`,
+/// ~3 MB more on top with `cjk-full`). The shape mirrors what Deno's
+/// `dev.mjs` populates from disk so the parity gate stays meaningful.
 fn install_embedded_fonts(rt: &mut JsRuntime) {
     let mut fonts: Vec<(&'static str, &'static [u8])> = Vec::new();
     fonts.extend_from_slice(excalidraw_image_fonts_core::FONTS);
     #[cfg(feature = "cjk")]
     fonts.extend_from_slice(excalidraw_image_fonts_cjk::FONTS);
+    #[cfg(feature = "cjk-full")]
+    fonts.extend_from_slice(excalidraw_image_fonts_cjk_extra::FONTS);
 
     deno_core::scope!(scope, rt);
     let context = scope.get_current_context();

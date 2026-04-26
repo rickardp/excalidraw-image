@@ -58,6 +58,7 @@ function readRecorded(cratePath) {
 const crates = [
   "crates/excalidraw-image-fonts-core",
   "crates/excalidraw-image-fonts-cjk",
+  "crates/excalidraw-image-fonts-cjk-extra",
 ];
 
 let ok = true;

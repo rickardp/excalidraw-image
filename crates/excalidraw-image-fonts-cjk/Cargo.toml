@@ -1,8 +1,11 @@
 [package]
 name = "excalidraw-image-fonts-cjk"
-# NOT workspace-inherited. Bumped only when fonts change. Verified by
-# `npm run check:fonts` (src/scripts/check-font-fingerprints.mjs).
-version = "0.1.0"
+# NOT workspace-inherited. Starts at 1.0.0 since the bundled-fonts API
+# (a single `pub static FONTS: &[(&str, &[u8])]` table) is stable; only
+# the woff2 contents will ever change. Patch is auto-bumped by
+# `npm run sync-fonts -- --bump` whenever the recorded fingerprint
+# drifts from the populated `fonts/` dir.
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
 description = "Bundled CJK fonts (Xiaolai) for excalidraw-image"
@@ -23,8 +26,8 @@ include = [
 # SHA-256 of (sorted relative path + ":" + sha256-hex of contents) lines, joined by "\n".
 # Verified by `npm run check:fonts`. Update this manually when fonts change,
 # alongside a version bump.
-sha256 = "5da4c50a534c9d00607f59741b8691aa2e1144619126306dc740c4cd1a8658e6"
-file_count = 209
+sha256 = "630cb497d7b7de4fea58a890b78a2de5ea0e74221d8b876156de4993698e24ad"
+file_count = 165
 
 [lib]
 path = "src/lib.rs"

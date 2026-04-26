@@ -22,9 +22,17 @@ path = "src/lib.rs"
 [features]
 default = []
 # CJK support: pulls in the Xiaolai shards via excalidraw-image-fonts-cjk.
-# Without this feature, only Latin-script fonts are bundled, keeping the
-# binary noticeably smaller for users who don't need CJK glyphs.
+# Covers modern Chinese, Japanese kanji, Korean Hangul Syllables, and
+# common CJK punctuation/compatibility ranges (~165 shards). Without this
+# feature, only Latin-script fonts are bundled, keeping the binary
+# noticeably smaller for users who don't need CJK glyphs.
 cjk = ["dep:excalidraw-image-fonts-cjk"]
+# Long-tail CJK: CJK Extension A (historical/rare characters used in
+# classical Chinese, names, dialect-specific terms), CJK Compatibility
+# Ideographs, CJK Radicals, and Hangul Jamo (~44 shards, ~3 MB extra).
+# Implies `cjk` — it makes no sense to ship the rare characters without
+# the common ones.
+cjk-full = ["cjk", "dep:excalidraw-image-fonts-cjk-extra"]
 
 [dependencies]
 # Pin deno_core to the F-002 validated version. serde_v8 is re-exported from
@@ -43,8 +51,9 @@ usvg = "0.45"
 tiny-skia = "0.11"
 # Font byte sources, split for crates.io's per-crate size cap and for opt-in
 # CJK. Always-on Latin core; CJK feature-gated.
-excalidraw-image-fonts-core = { version = "0.1.0", path = "../excalidraw-image-fonts-core" }
-excalidraw-image-fonts-cjk = { version = "0.1.0", path = "../excalidraw-image-fonts-cjk", optional = true }
+excalidraw-image-fonts-core = { version = "1.0.0", path = "../excalidraw-image-fonts-core" }
+excalidraw-image-fonts-cjk = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk", optional = true }
+excalidraw-image-fonts-cjk-extra = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk-extra", optional = true }
 
 [build-dependencies]
 # build.rs decompresses WOFF2 → TTF for the resvg fontdb. fontdb only consumes
@@ -60,8 +69,9 @@ excalidraw-image-fonts-cjk = { version = "0.1.0", path = "../excalidraw-image-fo
 # compile (deferred — see release.yml).
 woofwoof = "1"
 # Sub-crates are also build-deps so build.rs can read FONTS arrays directly.
-excalidraw-image-fonts-core = { version = "0.1.0", path = "../excalidraw-image-fonts-core" }
-excalidraw-image-fonts-cjk = { version = "0.1.0", path = "../excalidraw-image-fonts-cjk", optional = true }
+excalidraw-image-fonts-core = { version = "1.0.0", path = "../excalidraw-image-fonts-core" }
+excalidraw-image-fonts-cjk = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk", optional = true }
+excalidraw-image-fonts-cjk-extra = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk-extra", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
