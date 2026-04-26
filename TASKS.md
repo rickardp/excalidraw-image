@@ -947,8 +947,10 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 **Acceptance:** Documents expected divergences from web-app output and why. Links to relevant PLAN sections.
 
 ### D-004 — Fixture snapshot baseline
-**Status:** `todo` **Deps:** R-007
+**Status:** `done` **Deps:** R-007
 **Acceptance:** All `tests/fixtures/*.excalidraw` have committed golden `.svg` (and `.png` for Phase 7 fixtures). `vitest -u` and `cargo insta review` workflows documented in README.
+
+**Notes:** 7 SVG goldens committed (45 KB total). Regen via `make goldens` / `node src/scripts/regen-goldens.mjs`. Gate test at `tests/js/svg-goldens.test.mjs`. PNG goldens defer to PNG-003.
 
 ---
 
