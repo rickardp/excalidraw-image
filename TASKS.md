@@ -829,7 +829,7 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 ## PNG — Phase 7: PNG via native `resvg`
 
 ### PNG-001 — `src/raster.rs` — `resvg` integration
-**Status:** `todo` **Deps:** R-004, R-005
+**Status:** `done` **Deps:** R-004, R-005
 **Ref:** `PLAN.md` §5.5
 **Acceptance:**
 - `raster::svg_to_png(svg, args) -> Result<Vec<u8>>`.
@@ -837,22 +837,62 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Honors `args.scale` and `args.max`.
 - Returns deterministic PNG bytes (same input → same output).
 
+**Notes (completion):**
+- Embedding strategy: **Option Y** (single concatenated `embedded_fonts.bin`
+  + offset/length tuples), not Option X (per-font `include_bytes!`). Reason
+  is forced, not stylistic: `fontdb::Database::load_font_data` only accepts
+  raw TTF/OTF — passing WOFF2 bytes silently produces zero faces (verified
+  empirically by `font_dump` debug test before deletion). build.rs must
+  decompress WOFF2 → TTF, which means writing bytes anyway, so a single
+  blob with one `include_bytes!` is cleaner than 234 absolute-path
+  `include_bytes!` sites.
+- WOFF2 decoder picked: `woofwoof = "1"` (Google's C++ woff2 + pure-Rust
+  brotli). Tried `woff2 = "0.3"` (compile-fails against current
+  `safer-bytes`), `woff2-patched = "0.4"`, and `woff2-no-std = "0.3"`
+  (both panic with `Stream truncated` deep in their `glyf` decoder on
+  Excalidraw's Assistant-Bold.woff2). woofwoof decoded all 234 shards
+  cleanly. Adds a C++ build-time dep — fine for current macOS build;
+  Phase 8 cross-compile may need an alternative if `cc` won't bridge to
+  the target.
+- Slicing into a `&[u8]` is not yet const-stable (rust-lang/rust#143874),
+  so the generated table is `EMBEDDED_FONT_INDEX: &[(&str, usize, usize)]`
+  + `EMBEDDED_FONTS_BLOB: &[u8] = include_bytes!(…)`.
+  `raster::iter_embedded_fonts()` materializes `(&str, &[u8])` at runtime.
+- resvg/usvg/tiny-skia versions pinned at the 0.45 / 0.11 series — the
+  PLAN §5.5 sketch was written against that API. 0.47 is the latest but
+  was not needed.
+- `RasterOptions { scale, max }` carries the subset of `Args` that affects
+  rasterization. Other rendering opts (dark, padding, frame, …) flow
+  through the JS render step into the SVG.
+
 ### PNG-002 — `--format png` end-to-end
-**Status:** `blocked` **Deps:** PNG-001, R-002
+**Status:** `done` **Deps:** PNG-001, R-002
 **Acceptance:**
 - `excalidraw-image fixture.excalidraw -o out.png` writes a valid PNG.
 - `file out.png` reports `PNG image data`.
 - `identify out.png` width/height match the fixture's bounding box at `args.scale`.
 
+**Notes (completion):**
+- `main.rs` previously rejected `Format::Png` with a "not yet implemented"
+  message; that branch is now `raster::svg_to_png(&result.svg, …)`.
+- argv extension inference (`.png` → `Format::Png`) was already in place
+  from R-002 — verified by the existing `format_inferred_from_output_ext_png`
+  test. No new argv work needed.
+- Smoke harness at `crates/excalidraw-image/tests/png.rs`: 3 tests
+  covering `-o foo.png` (extension inference), explicit `--format png` to
+  stdout, and the text-rendering path (which is the canary for fontdb
+  silently coming up empty — if WOFF2→TTF decompression broke, this test
+  flags it via PNG file size).
+
 ### PNG-003 — PNG fixtures and snapshot
-**Status:** `blocked` **Deps:** PNG-002
+**Status:** `todo` **Deps:** PNG-002
 **Files:** `tests/fixtures/*.png.snapshot` (binary golden)
 **Acceptance:**
 - Golden PNGs generated once; test diffs via pixel-match (tolerance ≤1 per 100k pixels).
 - Covers: basic shapes, text, image, frames.
 
 ### PNG-004 — PNG font fidelity
-**Status:** `blocked` **Deps:** PNG-001, FNT-005
+**Status:** `todo` **Deps:** PNG-001, FNT-005
 **Acceptance:** `resvg` picks the correct bundled WOFF2 for each text element via `fontdb` matching. Compare rendered text region against a headless-browser PNG of the same scene: SSIM ≥ 0.95.
 
 ---

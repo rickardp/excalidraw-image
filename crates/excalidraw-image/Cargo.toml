@@ -28,6 +28,29 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
 lexopt = "0.3"
+# PNG-001: native PNG rasterization. resvg + tiny-skia render the SVG; usvg
+# parses with a fontdb populated from EMBEDDED_FONTS (build.rs). 0.45 is the
+# latest series whose published API matches the PLAN §5.5 sketch.
+resvg = "0.45"
+usvg = "0.45"
+tiny-skia = "0.11"
+
+[build-dependencies]
+# PNG-001: walk the npm font dir at build time to enumerate WOFF2 files for
+# the embedded font table, decompress them once, and emit a single
+# concatenated TTF blob. fontdb (used by usvg/resvg) only consumes raw TTF/
+# OTF — loading WOFF2 bytes silently produces zero faces. Decompressing at
+# build time keeps cold-start fast and keeps the runtime crate dep-free of
+# WOFF2 decoders.
+#
+# `woofwoof` is the only WOFF2 decoder I tested that successfully decoded
+# the Excalidraw font shards (`woff2` 0.3 fails to compile against current
+# `safer-bytes`; both `woff2-patched` 0.4 and `woff2-no-std` 0.3 panic with
+# "Stream truncated" deep in their `glyf` decoder on Assistant-Bold.woff2 —
+# verified empirically). woofwoof binds the Google C++ woff2 library +
+# pure-Rust `brotli` and decodes all 234 font files cleanly.
+walkdir = "2"
+woofwoof = "1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }

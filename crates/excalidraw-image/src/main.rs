@@ -1,4 +1,4 @@
-// R-004 — `excalidraw-image` CLI entry point.
+// R-004 / PNG-002 — `excalidraw-image` CLI entry point.
 //
 // Wires:
 //   * argv parsing (R-002) — `argv::parse` takes an iterator excluding argv[0],
@@ -8,14 +8,14 @@
 //   * file / stdin I/O — `-` means stdin for input and stdout for output.
 //   * engine invocation (R-003) — one-shot `Engine::new()` + `render()`. No
 //     warm reuse yet; cold-start is already <100 ms per F-002.
+//   * PNG rasterization (PNG-001) — when `--format png` (or `.png` extension),
+//     hand the SVG string to `raster::svg_to_png` which returns PNG bytes.
 //
 // Exit-code policy (R-008 acceptance, PLAN §5.8):
 //   0 — success.
-//   1 — runtime errors: missing input file, invalid JSON scene, JS-side throw.
+//   1 — runtime errors: missing input file, invalid JSON scene, JS-side
+//       throw, or rasterization failure.
 //   2 — argv errors: unknown flag, bad number, duplicate positional.
-//
-// Phase 7 (PNG via resvg) adds a Png branch on the write step. v1 keeps SVG
-// only; rejecting `--format png` here gives a clear error until PNG-001 lands.
 //
 // The top-level `main` is a thin wrapper: it converts `run()`'s error into a
 // stderr line and the right exit code. Anything more clever (stack traces,
@@ -27,6 +27,7 @@ use anyhow::Context;
 
 use excalidraw_image::argv::{self, ArgvError, Format};
 use excalidraw_image::engine;
+use excalidraw_image::raster;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
@@ -59,19 +60,10 @@ async fn run() -> Result<(), RunError> {
         ArgvError::Parse(err) => RunError::Argv(err),
     })?;
 
-    // Step 2 — refuse PNG until Phase 7 lands. Clear message so users don't
-    // wonder why SVG came out when they asked for PNG.
-    if args.format == Format::Png {
-        return Err(RunError::Runtime(anyhow::anyhow!(
-            "PNG output is not yet implemented (Phase 7 / PNG-001). \
-             Use --format svg or omit --format."
-        )));
-    }
-
-    // Step 3 — read input. Per PLAN §5.3, `-` means stdin.
+    // Step 2 — read input. Per PLAN §5.3, `-` means stdin.
     let scene = read_input(&args.input).map_err(RunError::Runtime)?;
 
-    // Step 4 — render.
+    // Step 3 — render JS side → SVG string.
     let mut engine = engine::Engine::new();
     let result = engine
         .render(&scene, &args.opts_json())
@@ -79,10 +71,24 @@ async fn run() -> Result<(), RunError> {
         .context("render failed")
         .map_err(RunError::Runtime)?;
 
-    // Step 5 — write output. Pure SVG bytes; no trailing newline so
+    // Step 4 — pick output bytes. SVG goes out raw (no trailing newline so
     // `deno run … dev.mjs` and the Rust binary stay byte-identical when
-    // dev.mjs does `Deno.stdout.write` (no implicit newline).
-    let bytes = result.svg.into_bytes();
+    // dev.mjs does `Deno.stdout.write`). PNG goes through resvg with the
+    // embedded fontdb (PNG-001).
+    let bytes: Vec<u8> = match args.format {
+        Format::Svg => result.svg.into_bytes(),
+        Format::Png => {
+            let raster_opts = raster::RasterOptions {
+                scale: args.scale.map(|s| s as f32),
+                max: args.max.map(|m| m as u32),
+            };
+            raster::svg_to_png(&result.svg, &raster_opts)
+                .context("PNG rasterization failed")
+                .map_err(RunError::Runtime)?
+        }
+    };
+
+    // Step 5 — write output.
     write_output(&args.output, &bytes).map_err(RunError::Runtime)?;
 
     Ok(())
