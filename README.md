@@ -14,13 +14,15 @@ the REL-series tasks. See [TASKS.md](TASKS.md) for the live status board.
 
 ### Homebrew
 
+The formula ships from this repo (no separate tap repo). One-time tap:
+
 ```
-brew install rickardp/tap/excalidraw-image
+brew tap rickardp/excalidraw-image https://github.com/rickardp/excalidraw-image.git
+brew install excalidraw-image
 ```
 
-The tap may not exist yet; until [REL-004](TASKS.md) lands, use direct
-downloads from the [GitHub Releases](https://github.com/rickardp/excalidraw-svg-export/releases)
-page.
+Tap + formula land on the first release. Until then, use direct downloads
+from [GitHub Releases](https://github.com/rickardp/excalidraw-image/releases).
 
 ### Cargo
 
@@ -35,7 +37,7 @@ Not yet on crates.io; this becomes the supported path once
 ### Direct download
 
 Per-platform tarballs land on
-[GitHub Releases](https://github.com/rickardp/excalidraw-svg-export/releases)
+[GitHub Releases](https://github.com/rickardp/excalidraw-image/releases)
 once [REL-002](TASKS.md) is wired up. The binary is one self-contained
 executable; no runtime dependencies.
 
@@ -93,8 +95,8 @@ for the full architecture.
 ## Build from source
 
 ```
-git clone https://github.com/rickardp/excalidraw-svg-export
-cd excalidraw-svg-export
+git clone https://github.com/rickardp/excalidraw-image
+cd excalidraw-image
 make bootstrap   # npm + cargo + deno cache
 make core        # build dist/core.mjs
 cargo build --release -p excalidraw-image

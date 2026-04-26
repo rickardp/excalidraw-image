@@ -26,7 +26,9 @@
 #   * `cargo publish` runs in the `production` environment
 #     (workflow_dispatch only or after explicit approval) and is skipped
 #     if `CARGO_REGISTRY_TOKEN` isn't set.
-#   * Homebrew tap PR is skipped if `HOMEBREW_TAP_TOKEN` isn't set.
+#   * Homebrew formula bump commits Formula/excalidraw-image.rb back to main
+#     using the built-in GITHUB_TOKEN (no extra secret required). The push
+#     uses `[skip ci]` to avoid retriggering test.yml.
 
 name: release
 
@@ -388,36 +390,28 @@ jobs:
           echo "CARGO_REGISTRY_TOKEN secret not set; skipped real publish (dry-run still ran)." \
             >> "$GITHUB_STEP_SUMMARY"
 
-  homebrew-pr:
-    # Open a PR against rickardp/homebrew-tap bumping the formula.
-    # Conditional on HOMEBREW_TAP_TOKEN secret. Skipped silently
-    # otherwise.
-    name: homebrew tap PR
+  homebrew-bump:
+    # Render the formula template with concrete URLs + SHAs and commit it
+    # back to Formula/excalidraw-image.rb on main. Uses the built-in
+    # GITHUB_TOKEN — no extra secret needed.
+    #
+    # Pattern A (in-repo tap): users tap this repo directly, so the formula
+    # ships from the project's own main branch. Commit message includes
+    # `[skip ci]` so test.yml doesn't retrigger.
+    name: bump in-repo Homebrew formula
     needs: [release]
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || github.event.inputs.tag != '' }}
+    permissions:
+      contents: write
     steps:
-      - name: Check token presence
-        id: gate
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: |
-          if [ -n "${HOMEBREW_TAP_TOKEN:-}" ]; then
-            echo "have_token=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "have_token=false" >> "$GITHUB_OUTPUT"
-            echo "HOMEBREW_TAP_TOKEN missing; skipping homebrew PR." \
-              >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: Checkout this repo (for the formula stub)
-        if: steps.gate.outputs.have_token == 'true'
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve version + SHAs
-        if: steps.gate.outputs.have_token == 'true'
+      - name: Resolve version
         id: ver
         shell: bash
         run: |
@@ -426,7 +420,6 @@ jobs:
           echo "version=${REF#v}" >> "$GITHUB_OUTPUT"
 
       - name: Download release artifacts
-        if: steps.gate.outputs.have_token == 'true'
         uses: actions/download-artifact@v4
         with:
           path: dist-release
@@ -434,7 +427,6 @@ jobs:
           merge-multiple: true
 
       - name: Read SHAs
-        if: steps.gate.outputs.have_token == 'true'
         id: shas
         shell: bash
         run: |
@@ -449,14 +441,13 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Render formula
-        if: steps.gate.outputs.have_token == 'true'
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
           BASE_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}"
-          TEMPLATE="homebrew-tap-formula.rb"
-          OUT="excalidraw-image.rb"
+          TEMPLATE=".github/templates/excalidraw-image.rb.tmpl"
+          mkdir -p Formula
           sed \
             -e "s|@@VERSION@@|${VERSION}|g" \
             -e "s|@@URL_DARWIN_ARM@@|${BASE_URL}/excalidraw-image-aarch64-apple-darwin.tar.gz|g" \
@@ -465,31 +456,21 @@ jobs:
             -e "s|@@SHA_DARWIN_X86@@|${{ steps.shas.outputs.darwin_x86 }}|g" \
             -e "s|@@URL_LINUX_X86@@|${BASE_URL}/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz|g" \
             -e "s|@@SHA_LINUX_X86@@|${{ steps.shas.outputs.linux_x86 }}|g" \
-            "$TEMPLATE" > "$OUT"
+            "$TEMPLATE" > "Formula/excalidraw-image.rb"
           echo "Rendered formula:"
-          cat "$OUT"
+          cat "Formula/excalidraw-image.rb"
 
-      - name: Open PR against rickardp/homebrew-tap
-        if: steps.gate.outputs.have_token == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      - name: Commit and push to main
         shell: bash
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          BRANCH="bump/excalidraw-image-${VERSION}"
           git config --global user.email "actions@github.com"
           git config --global user.name  "github-actions[bot]"
-          gh repo clone rickardp/homebrew-tap homebrew-tap -- --depth=1
-          cd homebrew-tap
-          git checkout -b "$BRANCH"
-          mkdir -p Formula
-          cp ../excalidraw-image.rb Formula/excalidraw-image.rb
           git add Formula/excalidraw-image.rb
-          git commit -m "excalidraw-image ${VERSION}"
-          git push -u origin "$BRANCH"
-          gh pr create \
-            --title "excalidraw-image ${VERSION}" \
-            --body "Automated formula bump for excalidraw-image ${VERSION}." \
-            --head "$BRANCH" \
-            --base main
+          if git diff --staged --quiet; then
+            echo "No formula changes — already up to date."
+            exit 0
+          fi
+          git commit -m "release: bump Homebrew formula to ${VERSION} [skip ci]"
+          git push origin main

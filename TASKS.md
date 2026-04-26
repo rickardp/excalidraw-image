@@ -965,7 +965,7 @@ GitHub UI and is out of scope for this commit.
 - Cross-builds all 5 targets.
 - Creates tarballs `excalidraw-image-<triple>.tar.gz` containing `excalidraw-image[.exe]` + LICENSE + README.
 - Uploads to GitHub Release.
-- Opens PR on `rickardp/homebrew-tap` bumping formula (via GH CLI).
+- Bumps in-repo Homebrew formula (`Formula/excalidraw-image.rb`) and commits to `main`.
 - `cargo publish --dry-run` runs; real publish gated on manual workflow approval.
 
 **Notes (completion):** Implemented at `.github/workflows/release.yml`.
@@ -976,7 +976,7 @@ echoed to the step summary. Aggregator job creates the GitHub Release
 with `generate_release_notes: true`. `cargo publish` runs in the
 `production` environment (manual approval) and is skipped if
 `CARGO_REGISTRY_TOKEN` is missing — the dry-run runs unconditionally.
-Homebrew PR job is skipped if `HOMEBREW_TAP_TOKEN` is missing.
+Homebrew formula bump (Pattern A) commits in-repo via the built-in `GITHUB_TOKEN` — no extra secret required.
 Verifiable end-to-end **only by pushing a real `v*` tag**; static lint
 via `actionlint` is clean.
 
@@ -996,19 +996,24 @@ fail (bare Mach-O binaries can't be stapled — notarization is honored
 via Gatekeeper online check at first launch). Verifiable **only when
 the Apple secrets are configured and a tag is pushed**.
 
-### REL-004 — Homebrew tap repo
-**Status:** `todo` **Deps:** REL-002
-**Files:** `rickardp/homebrew-tap` (external repo)
-**Acceptance:**
-- Repo exists with `Formula/excalidraw-image.rb` matching §5.8.
-- `brew tap rickardp/tap && brew install excalidraw-image` on macOS works end-to-end on a fresh machine.
+### REL-004 — Homebrew tap (in-repo, Pattern A)
+**Status:** `done` **Deps:** REL-002
+**Files:** `.github/templates/excalidraw-image.rb.tmpl`, `Formula/excalidraw-image.rb` (rendered by CI on each release)
 
-**Notes:** Stays `todo` until the user creates the
-`rickardp/homebrew-tap` GitHub repo. A formula stub with the right
-placeholders lives at `homebrew-tap-formula.rb` in this repo; the
-release workflow's `homebrew-pr` job renders it via `sed` and opens a
-PR against the tap. That PR job is gated on a `HOMEBREW_TAP_TOKEN`
-secret (a personal access token with `repo` scope on the tap).
+**Notes:** Switched from a separate `rickardp/homebrew-tap` repo to
+**Pattern A** (in-repo formula). The release workflow's `homebrew-bump`
+job renders the template into `Formula/excalidraw-image.rb` and commits
+to `main` using the built-in `GITHUB_TOKEN` (no extra secret required).
+Users tap with the explicit URL form:
+
+```
+brew tap rickardp/excalidraw-image https://github.com/rickardp/excalidraw-image.git
+brew install excalidraw-image
+```
+
+Trade-off: the first command is uglier than `brew tap rickardp/tap`,
+but maintenance is one repo instead of two. The Formula directory does
+not exist until the first release populates it.
 
 ### REL-005 — `cargo install` verification
 **Status:** `done` **Deps:** REL-002
@@ -1031,7 +1036,7 @@ the first publish lands.
 - `cargo binstall excalidraw-image` on a fresh machine pulls the binary.
 
 **Notes (completion):** Added to `crates/excalidraw-image/Cargo.toml`:
-- `pkg-url = "https://github.com/rickardp/excalidraw-svg-export/releases/download/v{ version }/excalidraw-image-{ target }.tar.gz"`
+- `pkg-url = "https://github.com/rickardp/excalidraw-image/releases/download/v{ version }/excalidraw-image-{ target }.tar.gz"`
 - `pkg-fmt = "tgz"`
 - `bin-dir = "{ bin }{ binary-ext }"`
 
@@ -1084,7 +1089,7 @@ SSIM measurement reveals anything unexpected.
 ## Appendix: REL series — what's verifiable now vs at tag-push
 
 The REL/SZ work landed entirely as static config files (`.github/workflows/*.yml`,
-`homebrew-tap-formula.rb`, `[package.metadata.binstall]`). That makes
+`.github/templates/excalidraw-image.rb.tmpl`, `[package.metadata.binstall]`). That makes
 **most acceptance criteria unverifiable until a real `v*` tag is pushed**.
 Tracking what we *can* check now:
 
@@ -1094,21 +1099,23 @@ Tracking what we *can* check now:
 | `cargo install --path crates/excalidraw-image` builds + binary smokes | now (passed locally) |
 | `cargo publish --dry-run` clean | once the `production` env runs the publish job |
 | `cargo binstall excalidraw-image` works | only after the first tagged GH Release |
-| Homebrew formula installs | only after `rickardp/homebrew-tap` exists (REL-004) and a tagged release |
+| Homebrew formula installs | only after the first tagged release (in-repo formula committed by CI) |
 | macOS notarized binary opens without quarantine prompt | only when Apple secrets are configured + tag pushed |
 | Linux ARM64 binary | not shipping in v1 (deferred) |
 
 **To actually ship v1**, the user needs to:
 
-1. Create `rickardp/homebrew-tap` (closes REL-004).
-2. Configure repo secrets: `APPLE_DEVELOPER_ID_APPLICATION_CERT` (+ password
-   + identity), `APPLE_NOTARY_APPLE_ID`, `APPLE_NOTARY_TEAM_ID`,
-   `APPLE_NOTARY_APP_PASSWORD`, `CARGO_REGISTRY_TOKEN`, `HOMEBREW_TAP_TOKEN`.
-3. Configure a `production` GitHub Environment with required reviewers
+1. Configure repo secrets (all optional — graceful skip if absent):
+   `APPLE_DEVELOPER_ID_APPLICATION_CERT` (+ password + identity),
+   `APPLE_NOTARY_APPLE_ID`, `APPLE_NOTARY_TEAM_ID`,
+   `APPLE_NOTARY_APP_PASSWORD`, `CARGO_REGISTRY_TOKEN`. The Homebrew
+   bump uses the built-in `GITHUB_TOKEN` and needs no extra secret.
+2. Configure a `production` GitHub Environment with required reviewers
    (gates `cargo publish`).
-4. Push a tag `vX.Y.Z` matching the version in
+3. Push a tag `vX.Y.Z` matching the version in
    `crates/excalidraw-image/Cargo.toml`. The release workflow handles
-   the rest.
+   the rest, including committing `Formula/excalidraw-image.rb` back
+   to `main`.
 
 ---
 

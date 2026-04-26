@@ -1,9 +1,11 @@
 # Homebrew formula stub for `excalidraw-image`.
 #
 # This file is a TEMPLATE. The release workflow (`.github/workflows/release.yml`,
-# `homebrew-pr` job) renders it with concrete values via `sed`, then opens
-# a PR against `rickardp/homebrew-tap` (REL-004 — that tap repo must be
-# created manually before the PR step works).
+# `homebrew-bump` job) renders it with concrete values via `sed` and commits
+# the result to `Formula/excalidraw-image.rb` in this repo. Users tap with:
+#
+#   brew tap rickardp/excalidraw-image https://github.com/rickardp/excalidraw-image.git
+#   brew install excalidraw-image
 #
 # Placeholders rendered by the workflow:
 #   @@VERSION@@           the released version (no leading `v`)
@@ -20,7 +22,7 @@
 
 class ExcalidrawImage < Formula
   desc "Convert Excalidraw files to SVG/PNG (self-contained native binary)"
-  homepage "https://github.com/rickardp/excalidraw-svg-export"
+  homepage "https://github.com/rickardp/excalidraw-image"
   version "@@VERSION@@"
   license "MIT"
 

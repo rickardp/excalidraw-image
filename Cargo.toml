@@ -7,7 +7,7 @@ resolver = "2"
 edition = "2021"
 license = "MIT"
 authors = ["Rickard"]
-repository = "https://github.com/rickardp/excalidraw-svg-export"
+repository = "https://github.com/rickardp/excalidraw-image"
 rust-version = "1.75"
 
 [profile.release]

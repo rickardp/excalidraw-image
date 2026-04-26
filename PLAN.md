@@ -921,19 +921,29 @@ editor by default. Mitigations, in order of leverage:
      `**/css/**`
    This is the guarantee; bundle size is the proxy.
 
-### 5.8 Homebrew tap
+### 5.8 Homebrew tap (in-repo, Pattern A)
 
-Repo: `rickardp/homebrew-tap`. Formula:
+The formula ships from this repo's own `Formula/excalidraw-image.rb`,
+rendered by the release workflow from `.github/templates/excalidraw-image.rb.tmpl`
+on each tag push. Users tap with the explicit URL form:
+
+```
+brew tap rickardp/excalidraw-image https://github.com/rickardp/excalidraw-image.git
+brew install excalidraw-image
+```
+
+Maintenance benefit: one repo instead of two; no `HOMEBREW_TAP_TOKEN`
+secret needed (the bump uses the built-in `GITHUB_TOKEN`). Rendered formula:
 
 ```rb
 class ExcalidrawImage < Formula
   desc "Convert Excalidraw files to SVG/PNG"
-  homepage "https://github.com/rickardp/excalidraw-svg-export"
+  homepage "https://github.com/rickardp/excalidraw-image"
   version "0.1.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/rickardp/excalidraw-svg-export/releases/download/v0.1.0/excalidraw-image-darwin-arm64.tar.gz"
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-darwin-arm64.tar.gz"
       sha256 "..."
     end
     on_intel do
@@ -998,7 +1008,7 @@ cargo binstall excalidraw-image       # pulls the GH Release tarball
 ## 7. Repository layout
 
 ```
-/Users/rickard/oss/excalidraw-svg-export/
+excalidraw-image/
   PLAN.md                           # this file
   SVG_EXPORT.md                     # upstream reference plan (kept in sync)
   README.md
@@ -1111,7 +1121,7 @@ and a hard CI fail.
   3. Sign/notarize macOS binaries (skip if no cert secret).
   4. Upload tarballs to GH release.
   5. `cargo publish` to crates.io (manual approval gate).
-  6. Open PR against `rickardp/homebrew-tap` bumping the formula url+sha.
+  6. Bump in-repo `Formula/excalidraw-image.rb` and commit to `main` (Pattern A).
 
 ### 8.3 Versioning
 
