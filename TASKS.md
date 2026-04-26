@@ -1106,11 +1106,10 @@ Tracking what we *can* check now:
 **To actually ship v1**, the user needs to:
 
 1. Set repo secret `CARGO_REGISTRY_TOKEN` (already done). No other
-   secrets required — Homebrew uses the built-in `GITHUB_TOKEN`, Apple
-   notarization is deferred to v1.x, Linux ARM64 is deferred.
-2. Set `Settings → Actions → General → Workflow permissions` to "Read
-   and write" (so `homebrew-bump` can push back to `main`).
-3. Run `cargo release patch --execute` (or `minor`/`major`) from `main`.
+   secrets required — Homebrew uses the built-in `GITHUB_TOKEN` (per-job
+   `permissions: contents: write` is declared in the workflow YAML),
+   Apple notarization is deferred to v1.x, Linux ARM64 is deferred.
+2. Run `cargo release patch --execute` (or `minor`/`major`) from `main`.
    The tool bumps the version, commits, tags `vX.Y.Z`, and pushes —
    triggering `.github/workflows/release.yml`. The tag is the gate.
 
