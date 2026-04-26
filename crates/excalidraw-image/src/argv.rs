@@ -151,6 +151,23 @@ FONTS:
 
   -h, --help                  Show this help.
   -v, --version               Show version.
+
+EXAMPLES:
+  # Convert to SVG (stdout):
+  excalidraw-image scene.excalidraw
+
+  # Convert to file (format inferred from extension):
+  excalidraw-image scene.excalidraw -o scene.svg
+  excalidraw-image scene.excalidraw -o scene.png
+
+  # Editable .excalidraw.svg (round-trips on excalidraw.com):
+  excalidraw-image scene.excalidraw --embed-scene -o scene.excalidraw.svg
+
+  # PNG at 2x resolution, capped at 1920px:
+  excalidraw-image scene.excalidraw --scale 2 --max 1920 -o scene.png
+
+  # From stdin to stdout:
+  cat scene.excalidraw | excalidraw-image - --format svg > scene.svg
 ";
 
 /// Parse `args` into an `Args`. The iterator should NOT include the

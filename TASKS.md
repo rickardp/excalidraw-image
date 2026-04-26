@@ -978,8 +978,10 @@ README note deferred to D-001 (the README itself doesn't exist yet).
 - Link to `PLAN.md` for architecture, `SVG_EXPORT.md` for the deep dive.
 
 ### D-002 — `--help` polish
-**Status:** `blocked` **Deps:** R-002
+**Status:** `done` **Deps:** R-002
 **Acceptance:** Output fits in 80 cols; grouped (Inputs / Outputs / Rendering / Fonts); includes an examples section.
+
+**Notes:** EXAMPLES section added in argv.rs covering stdout, file output, format inference, embed-scene round-trip, scale+max, stdin pipe.
 
 ### D-003 — Fidelity caveats doc
 **Status:** `blocked` **Deps:** FNT-005, PNG-004
