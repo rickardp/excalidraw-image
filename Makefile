@@ -58,6 +58,11 @@ parity: core
 audit: core
 	npm run audit
 
+# D-004: regenerate committed SVG goldens. Manual-intent operation; not part
+# of `make test`. Run when a change to the export path is intentional.
+goldens: core
+	node src/scripts/regen-goldens.mjs
+
 # J-012: smoke test for the shipped bundle under Deno. Imports dist/core.mjs
 # directly (not src/core/**), so it validates the esbuild alias + stub chain.
 # Depends on core to guarantee the bundle is current.
