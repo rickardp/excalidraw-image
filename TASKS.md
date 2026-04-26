@@ -968,17 +968,17 @@ GitHub UI and is out of scope for this commit.
 - Bumps in-repo Homebrew formula (`Formula/excalidraw-image.rb`) and commits to `main`.
 - `cargo publish --dry-run` runs; real publish gated on manual workflow approval.
 
-**Notes (completion):** Implemented at `.github/workflows/release.yml`.
-Builds 4 targets (Linux ARM64 deferred — see SZ-001 / REL-002 header
-comment). Tarball naming + `<triple>` matches REL-006's binstall
-metadata. SHA-256 of each tarball is uploaded next to the artifact and
-echoed to the step summary. Aggregator job creates the GitHub Release
-with `generate_release_notes: true`. `cargo publish` runs in the
-`production` environment (manual approval) and is skipped if
-`CARGO_REGISTRY_TOKEN` is missing — the dry-run runs unconditionally.
-Homebrew formula bump (Pattern A) commits in-repo via the built-in `GITHUB_TOKEN` — no extra secret required.
-Verifiable end-to-end **only by pushing a real `v*` tag**; static lint
-via `actionlint` is clean.
+**Notes (completion):** Reworked to match the unretro release pattern.
+Pipeline: `verify` → `create-release` (draft) → `publish-crate` +
+`build-binaries` (parallel) → `homebrew-bump` → `finalize-release` (un-draft).
+Builds 4 targets (Linux ARM64 deferred — woofwoof C++ build dep
+complicates `cross`). Tarball naming matches REL-006's binstall
+metadata. **No `production` environment, no manual approval gate** —
+the tag IS the gate. `cargo publish` is idempotent ("already exists" =
+success). `homebrew-bump` pushes `Formula/excalidraw-image.rb` to
+`main` via the built-in `GITHUB_TOKEN` (Pattern A). Driven locally by
+`cargo release` (configured in `release.toml`). Apple notarization
+deferred. `actionlint` clean.
 
 ### REL-003 — macOS codesigning
 **Status:** `done` **Deps:** REL-002
@@ -1105,17 +1105,27 @@ Tracking what we *can* check now:
 
 **To actually ship v1**, the user needs to:
 
-1. Configure repo secrets (all optional — graceful skip if absent):
-   `APPLE_DEVELOPER_ID_APPLICATION_CERT` (+ password + identity),
-   `APPLE_NOTARY_APPLE_ID`, `APPLE_NOTARY_TEAM_ID`,
-   `APPLE_NOTARY_APP_PASSWORD`, `CARGO_REGISTRY_TOKEN`. The Homebrew
-   bump uses the built-in `GITHUB_TOKEN` and needs no extra secret.
-2. Configure a `production` GitHub Environment with required reviewers
-   (gates `cargo publish`).
-3. Push a tag `vX.Y.Z` matching the version in
-   `crates/excalidraw-image/Cargo.toml`. The release workflow handles
-   the rest, including committing `Formula/excalidraw-image.rb` back
-   to `main`.
+1. Set repo secret `CARGO_REGISTRY_TOKEN` (already done). No other
+   secrets required — Homebrew uses the built-in `GITHUB_TOKEN`, Apple
+   notarization is deferred to v1.x, Linux ARM64 is deferred.
+2. Set `Settings → Actions → General → Workflow permissions` to "Read
+   and write" (so `homebrew-bump` can push back to `main`).
+3. Run `cargo release patch --execute` (or `minor`/`major`) from `main`.
+   The tool bumps the version, commits, tags `vX.Y.Z`, and pushes —
+   triggering `.github/workflows/release.yml`. The tag is the gate.
+
+The release workflow:
+
+- Verifies the tag matches Cargo.toml (fast-fail).
+- Drafts a GitHub Release with auto-generated notes.
+- `cargo publish` to crates.io (idempotent on rerun).
+- Builds binaries for 4 targets, uploads tarballs to the draft release.
+- Renders `Formula/excalidraw-image.rb` and commits it back to `main`
+  with `[skip ci]`.
+- Un-drafts the release once everything succeeded.
+
+If anything fails partway, the release stays draft. Re-running on the
+same tag is safe — every step is idempotent.
 
 ---
 

@@ -123,6 +123,35 @@ fixture in `tests/fixtures/`. Both hosts must produce byte-identical SVG
 To regenerate the committed SVG goldens after an intentional rendering
 change: `make goldens`.
 
+## Releasing
+
+Driven by [`cargo release`](https://github.com/crate-ci/cargo-release)
+locally and `.github/workflows/release.yml` on push:
+
+```
+cargo release patch --execute    # 0.1.0 -> 0.1.1, commits, tags v0.1.1, pushes
+```
+
+The tag itself is the gate — pushing it triggers the release workflow,
+which:
+
+1. Verifies the tag matches `crates/excalidraw-image/Cargo.toml`.
+2. Creates a draft GitHub Release.
+3. `cargo publish` to crates.io (idempotent on rerun).
+4. Builds CLI binaries for `x86_64-unknown-linux-gnu`,
+   `aarch64-apple-darwin`, `x86_64-apple-darwin`,
+   `x86_64-pc-windows-msvc`. Tarballs uploaded to the release.
+5. Renders `Formula/excalidraw-image.rb` from the in-repo template and
+   commits it back to `main` with `[skip ci]` so the next `brew tap`
+   sees the bumped formula.
+6. Un-drafts the release.
+
+Required secret: `CARGO_REGISTRY_TOKEN`. Everything else uses the
+built-in `GITHUB_TOKEN`. macOS notarization is **not** wired in v1 —
+first-run users hit Gatekeeper; document
+`xattr -d com.apple.quarantine target/release/excalidraw-image` if it
+matters. Linux ARM64 is deferred (woofwoof C++ dep + cross-compile).
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
