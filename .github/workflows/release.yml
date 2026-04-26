@@ -110,7 +110,33 @@ jobs:
         run: |
           mkdir -p crates/excalidraw-image/assets
           cp dist/core.mjs crates/excalidraw-image/assets/core.mjs
-      - name: cargo publish (idempotent)
+      - name: Verify font fingerprints
+        # Catches drift: fonts changed but version + recorded fingerprint not
+        # bumped. Fails fast before any publish runs.
+        run: npm run check:fonts
+      - name: Publish font sub-crates (idempotent, in dep order)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        # Font sub-crates publish before the main crate. Their version is
+        # bumped manually only when fonts change; on most releases the
+        # publish is a no-op ("already uploaded" treated as success).
+        shell: bash
+        run: |
+          set -euo pipefail
+          for c in excalidraw-image-fonts-core excalidraw-image-fonts-cjk; do
+            echo "::group::publish $c"
+            set +e
+            out=$(cargo publish -p "$c" --allow-dirty --locked 2>&1)
+            rc=$?
+            set -e
+            printf '%s\n' "$out"
+            if [ "$rc" -ne 0 ] && ! printf '%s' "$out" | grep -qE "already (exists|uploaded)"; then
+              echo "::endgroup::"
+              exit "$rc"
+            fi
+            echo "::endgroup::"
+          done
+      - name: Publish main crate (idempotent)
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         # Idempotent: re-running on the same tag treats "already exists"

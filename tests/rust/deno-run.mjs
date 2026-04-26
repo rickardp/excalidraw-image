@@ -22,6 +22,34 @@
 // the output matches the Rust binary byte-for-byte. `console.log` adds
 // a newline and would therefore break byte-identity — do NOT use it.
 
+// Populate globalThis.__embeddedFonts BEFORE importing dist/core.mjs.
+// fetch-fonts.mjs and text-metrics.mjs (inside the bundle) read from this
+// global at render time. The Rust shell populates the same global from its
+// font sub-crates via include_bytes!.
+//
+// Resolve the fonts dir relative to this script's location so cargo test
+// (which sets a different cwd) finds it.
+{
+  const here = new URL(".", import.meta.url).pathname;
+  const fontsRoot = `${here}../../node_modules/@excalidraw/excalidraw/dist/prod/fonts`;
+  const map = {};
+  async function* walkWoff2(dir) {
+    for await (const entry of Deno.readDir(dir)) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory) {
+        yield* walkWoff2(full);
+      } else if (entry.isFile && entry.name.toLowerCase().endsWith(".woff2")) {
+        yield full;
+      }
+    }
+  }
+  for await (const full of walkWoff2(fontsRoot)) {
+    const rel = full.slice(fontsRoot.length + 1);
+    map[rel] = await Deno.readFile(full);
+  }
+  globalThis.__embeddedFonts = map;
+}
+
 import "../../dist/core.mjs";
 
 const path = Deno.args[0];

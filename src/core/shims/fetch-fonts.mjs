@@ -1,54 +1,58 @@
 // src/core/shims/fetch-fonts.mjs
 //
 // Installs a `globalThis.fetch` wrapper that:
-//   1. Serves Excalidraw's bundled WOFF2 font assets from FONT_ASSETS,
-//      returning a synthetic Response-like object. Excalidraw only calls
-//      `.arrayBuffer()` on these; other members are stubbed.
+//   1. Serves Excalidraw's bundled WOFF2 font assets from
+//      `globalThis.__embeddedFonts` (populated by the host before render —
+//      Rust shell loads from sub-crate FONTS arrays; Deno dev path reads
+//      from node_modules/...).
 //   2. Delegates `data:` URLs to the previous (host) fetch if present, or
 //      parses them inline to a Response-like fallback.
 //   3. Throws `Error("network fetch not allowed in CLI: <url>")` for any
 //      other URL — see PLAN.md §4.2 and §4A.7.
 //
-// Host-neutral: no node:*, no fs, no Buffer. Uses `atob` from web-globals.
-// Idempotent — calling install twice leaves a single wrapper in place.
-//
-// J-004 — replaces the F-001 spike fetch shim that 404'd all font URLs.
+// Host-neutral: no node:*, no fs, no Buffer. Idempotent — calling install
+// twice leaves a single wrapper in place.
 
-import { FONT_ASSETS } from "../font-assets.mjs";
+import { FONT_PATHS } from "../font-assets.mjs";
 
-// Marker we stamp on our wrapper so a second install call is a no-op.
 const INSTALLED_MARKER = Symbol.for("excalidraw-image.fetch-fonts.installed");
 
-// Built once, at module load. Maps font-asset path (e.g.
-// "Excalifont/Excalifont-Regular-<hash>.woff2") to its base64 payload.
-// Runtime path-index — PLAN §4A.7 says we do not pre-bake FONT_URL_MAP.
-const PATH_INDEX = (() => {
-  const m = new Map();
-  for (const entries of Object.values(FONT_ASSETS)) {
-    for (const entry of entries) {
-      m.set(entry.path, entry.base64);
-    }
+// All known font paths (e.g. "Excalifont/Excalifont-Regular-<hash>.woff2"),
+// pre-flattened from FONT_PATHS at module load. Bytes are looked up at fetch
+// time from globalThis.__embeddedFonts[path].
+const KNOWN_PATHS = (() => {
+  const out = [];
+  for (const entries of Object.values(FONT_PATHS)) {
+    for (const entry of entries) out.push(entry.path);
   }
-  return m;
+  return out;
 })();
 
-function findFontBase64ForUrl(url) {
+function findFontPathForUrl(url) {
   // Excalidraw requests fonts via
   //   <PKG_NAME>@<PKG_VERSION>/dist/prod/fonts/<Family>/<filename>.woff2
   // We match by suffix so any host/CDN prefix works.
-  for (const [path, base64] of PATH_INDEX) {
-    if (url.endsWith(path)) return base64;
+  for (const path of KNOWN_PATHS) {
+    if (url.endsWith(path)) return path;
   }
   return null;
 }
 
-function base64ToBytes(b64) {
-  // Relies on `atob` installed by web-globals.mjs (J-002) or present
-  // natively on V8 hosts. We read through globalThis to stay explicit.
-  const bin = globalThis.atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+function lookupFontBytes(path) {
+  // The host (Rust shell or Deno dev entry) populates this global with a
+  // map of path → Uint8Array before invoking __render. If it's missing or
+  // doesn't contain the requested path, we throw a clear error.
+  const map = globalThis.__embeddedFonts;
+  if (!map) {
+    throw new Error(
+      `font asset requested but globalThis.__embeddedFonts not populated by host: ${path}`,
+    );
+  }
+  const bytes = map[path];
+  if (!bytes) {
+    throw new Error(`font asset not loaded by host: ${path}`);
+  }
+  return bytes;
 }
 
 function urlFromInput(input) {
@@ -113,7 +117,9 @@ function parseDataUrlInline(url) {
 
   let bytes;
   if (isBase64) {
-    bytes = base64ToBytes(payload);
+    const bin = globalThis.atob(payload);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   } else {
     const decoded = decodeURIComponent(payload);
     bytes = new Uint8Array(decoded.length);
@@ -185,9 +191,11 @@ export function installFetchFontsShim() {
       return parseDataUrlInline(url);
     }
 
-    const base64 = findFontBase64ForUrl(url);
-    if (base64 !== null) {
-      return synthesizeFontResponse(base64ToBytes(base64), url);
+    const path = findFontPathForUrl(url);
+    if (path !== null) {
+      const bytes = lookupFontBytes(path);
+      const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      return synthesizeFontResponse(view, url);
     }
 
     throw new Error(`network fetch not allowed in CLI: ${url}`);

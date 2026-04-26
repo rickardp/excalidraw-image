@@ -11,13 +11,16 @@ describe("font-assets smoke", () => {
     expect(FONT_ASSETS.Excalifont.length).toBeGreaterThan(0);
     const first = FONT_ASSETS.Excalifont[0];
     expect(typeof first.path).toBe("string");
-    expect(typeof first.base64).toBe("string");
-    expect(first.base64.length).toBeGreaterThan(0);
+    // After the font-split refactor, FONT_ASSETS holds metadata only;
+    // bytes are looked up via globalThis.__embeddedFonts (populated by the
+    // host before render). Vitest's setup-embedded-fonts.mjs primes it from
+    // node_modules.
+    expect(globalThis.__embeddedFonts[first.path]).toBeDefined();
   });
 
   it("Excalifont bytes decode to a WOFF2 magic header (wOF2)", () => {
     const first = FONT_ASSETS.Excalifont[0];
-    const bytes = Uint8Array.from(Buffer.from(first.base64, "base64"));
+    const bytes = globalThis.__embeddedFonts[first.path];
     expect(bytes.length).toBeGreaterThan(4);
     // WOFF2 magic number per https://www.w3.org/TR/WOFF2/ §3 = 0x774F4632 "wOF2".
     const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);

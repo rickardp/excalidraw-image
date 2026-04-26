@@ -81,13 +81,14 @@ function _stripQuotes(s) {
   return s;
 }
 
-function _base64ToBytes(b64) {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) {
-    out[i] = bin.charCodeAt(i);
-  }
-  return out;
+function _bytesForPath(path) {
+  // Bytes are populated by the host (Rust shell or Deno dev path) on
+  // globalThis.__embeddedFonts before render. See PLAN.md §4A.7.
+  const map = globalThis.__embeddedFonts;
+  if (!map) return null;
+  const v = map[path];
+  if (!v) return null;
+  return v instanceof Uint8Array ? v : new Uint8Array(v);
 }
 
 export class FontkitTextMetricsProvider {
@@ -145,12 +146,18 @@ export class FontkitTextMetricsProvider {
       this._fontCache.set(family, null);
       return null;
     }
-    const fonts = entries.map((entry) => {
-      const bytes = _base64ToBytes(entry.base64);
+    const fonts = [];
+    for (const entry of entries) {
+      const bytes = _bytesForPath(entry.path);
+      if (!bytes) continue; // host didn't load this shard; skip silently
       // fontkit.create accepts any object with { buffer, byteOffset,
-      // byteLength, length } — Uint8Array qualifies, no Buffer needed.
-      return fontkit.create(bytes);
-    });
+      // byteLength, length } — Uint8Array qualifies.
+      fonts.push(fontkit.create(bytes));
+    }
+    if (fonts.length === 0) {
+      this._fontCache.set(family, null);
+      return null;
+    }
     this._fontCache.set(family, fonts);
     return fonts;
   }

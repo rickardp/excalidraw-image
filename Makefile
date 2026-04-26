@@ -51,12 +51,16 @@ rust:
 # compares stdout byte-for-byte. Depends on `core` because both hosts load
 # `dist/core.mjs`.
 parity: core
-	cargo test -p excalidraw-image --release --test parity
+	# `--features cjk` so the Rust side has the Xiaolai fonts loaded,
+	# matching what Deno's dev path reads from node_modules. Without cjk,
+	# the mixed-script fixture diverges (Rust omits CJK glyphs).
+	cargo test -p excalidraw-image --release --features cjk --test parity
 
 # J-011: CI gate against forbidden imports in dist/core.mjs. Requires a
 # fresh dist/meta.json, so build core first.
 audit: core
 	npm run audit
+	npm run check:fonts
 
 # D-004: regenerate committed SVG goldens. Manual-intent operation; not part
 # of `make test`. Run when a change to the export path is intentional.

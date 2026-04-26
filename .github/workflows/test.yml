@@ -106,10 +106,11 @@ jobs:
           else
             echo "GNU make not found; running test steps individually"
             npm run audit
+            npm run check:fonts
             deno test --allow-read tests/deno/
             npx vitest run --passWithNoTests
             cargo test
-            cargo test -p excalidraw-image --release --test parity
+            cargo test -p excalidraw-image --release --features cjk --test parity
           fi
 
       - name: Print binary size

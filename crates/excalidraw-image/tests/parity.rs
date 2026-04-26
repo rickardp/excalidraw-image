@@ -15,6 +15,14 @@
 // When a fixture fails, both outputs are dumped under `/tmp/parity-*.svg`
 // for side-by-side diffing. The test harness then `panic!`s with fixture
 // name + byte counts so CI logs make the regression obvious.
+//
+// **Requires the `cjk` feature.** The Deno driver loads every WOFF2 from
+// `node_modules/.../fonts/` (including Xiaolai's 209 CJK shards), so for
+// byte-identical output the Rust side must also have CJK fonts compiled
+// in. `make parity` invokes us with `--features cjk`. `cargo test`
+// without features skips this whole module silently.
+
+#![cfg(feature = "cjk")]
 
 use std::path::PathBuf;
 use std::process::Command;

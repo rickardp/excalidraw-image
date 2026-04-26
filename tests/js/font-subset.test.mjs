@@ -54,7 +54,10 @@ async function decompressToTtf(woff2Bytes) {
 async function findShardWithCodepoints(family, codepoints) {
   const shards = FONT_ASSETS[family];
   for (let i = 0; i < shards.length; i++) {
-    const bytes = Buffer.from(shards[i].base64, "base64");
+    // Bytes come from globalThis.__embeddedFonts (populated by
+    // tests/js/setup-embedded-fonts.mjs from node_modules).
+    const bytes = globalThis.__embeddedFonts[shards[i].path];
+    if (!bytes) continue;
     let ttf;
     try {
       ttf = await decompressToTtf(bytes);
@@ -103,7 +106,7 @@ describe("FNT-004 — subset round-trip per family", () => {
         }
 
         // 1. Decompress the source WOFF2 → TTF bytes.
-        const srcWoff2 = Buffer.from(match.shard.base64, "base64");
+        const srcWoff2 = Buffer.from(globalThis.__embeddedFonts[match.shard.path]);
         const srcTtf = await decompressToTtf(srcWoff2);
         expect(srcTtf.length).toBeGreaterThan(0);
 

@@ -364,6 +364,38 @@ fn prepare_core(src: &str) -> String {
     .replace("import.meta.url", "\"file:///core.mjs\"")
 }
 
+/// Populate `globalThis.__embeddedFonts` from the font sub-crates.
+///
+/// `fetch-fonts.mjs` and `text-metrics.mjs` look up byte payloads from this
+/// global at render time. Bytes are copied into V8-managed memory once at
+/// engine construction (~12 MB for Latin core, ~12 MB more if `cjk` feature
+/// is on). The shape mirrors what Deno's `dev.mjs` populates from disk so
+/// the parity gate stays meaningful.
+fn install_embedded_fonts(rt: &mut JsRuntime) {
+    let mut fonts: Vec<(&'static str, &'static [u8])> = Vec::new();
+    fonts.extend_from_slice(excalidraw_image_fonts_core::FONTS);
+    #[cfg(feature = "cjk")]
+    fonts.extend_from_slice(excalidraw_image_fonts_cjk::FONTS);
+
+    deno_core::scope!(scope, rt);
+    let context = scope.get_current_context();
+    let global = context.global(scope);
+
+    let obj = v8::Object::new(scope);
+    for (path, bytes) in fonts {
+        let backing = v8::ArrayBuffer::new_backing_store_from_vec(bytes.to_vec());
+        let buf = v8::ArrayBuffer::with_backing_store(scope, &backing.make_shared());
+        let arr = v8::Uint8Array::new(scope, buf, 0, bytes.len())
+            .expect("Uint8Array::new returned None");
+        let key = v8::String::new(scope, path)
+            .expect("v8::String::new returned None for font path");
+        obj.set(scope, key.into(), arr.into());
+    }
+    let key = v8::String::new(scope, "__embeddedFonts")
+        .expect("v8::String::new returned None for __embeddedFonts");
+    global.set(scope, key.into(), obj.into());
+}
+
 pub struct Engine {
     rt: JsRuntime,
 }
@@ -377,6 +409,7 @@ impl Engine {
         let mut rt = JsRuntime::new(RuntimeOptions::default());
         rt.execute_script("bootstrap.js", PRE_CORE_BOOTSTRAP)
             .expect("pre-core bootstrap failed to evaluate");
+        install_embedded_fonts(&mut rt);
         let core = prepare_core(CORE_MJS);
         rt.execute_script("core.mjs", core)
             .expect("core.mjs failed to load — did `make core` run cleanly?");

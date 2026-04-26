@@ -13,6 +13,31 @@ if (typeof Deno === "undefined") {
   throw new Error("dev.mjs runs only under Deno");
 }
 
+// Populate globalThis.__embeddedFonts BEFORE importing index.mjs. The
+// fetch-fonts and text-metrics shims (installed by index.mjs's import chain)
+// look up bytes here at render time. The Rust shell populates the same global
+// from include_bytes! in the font sub-crates; both hosts feed the same shim
+// with the same byte-for-byte content (parity gate R-007).
+{
+  const fontsRoot = "node_modules/@excalidraw/excalidraw/dist/prod/fonts";
+  const map = {};
+  async function* walkWoff2(dir) {
+    for await (const entry of Deno.readDir(dir)) {
+      const full = `${dir}/${entry.name}`;
+      if (entry.isDirectory) {
+        yield* walkWoff2(full);
+      } else if (entry.isFile && entry.name.toLowerCase().endsWith(".woff2")) {
+        yield full;
+      }
+    }
+  }
+  for await (const full of walkWoff2(fontsRoot)) {
+    const rel = full.slice(fontsRoot.length + 1);
+    map[rel] = await Deno.readFile(full);
+  }
+  globalThis.__embeddedFonts = map;
+}
+
 // Side-effect import: installs shims and registers globalThis.__render.
 import "./index.mjs";
 

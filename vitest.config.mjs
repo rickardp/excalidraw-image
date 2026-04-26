@@ -16,5 +16,6 @@ export default defineConfig({
     // trips the default 5s timeout under concurrent load.
     testTimeout: 30_000,
     hookTimeout: 30_000,
+    setupFiles: ["tests/js/setup-embedded-fonts.mjs"],
   },
 });

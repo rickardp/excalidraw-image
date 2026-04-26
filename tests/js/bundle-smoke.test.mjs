@@ -6,9 +6,10 @@
 // tests/deno/render.test.mjs, which imports the bundle and calls
 // `__render`. This file's purpose is to fail fast when someone runs
 // `npm test` (or `make test`) without having built the bundle first
-// (`make core`). The >10 MB floor matches the reality that the bundle
-// inlines Excalidraw's font assets (~17.5 MB of base64 WOFF2), so a
-// truncated or empty dist would be caught immediately.
+// (`make core`). The bundle is now ~3-5 MB after the font-split refactor
+// (fonts moved out of core.mjs into the host-populated
+// globalThis.__embeddedFonts), so the floor is set just above empty/stub
+// territory.
 //
 // Why not import the bundle and render here? Because vitest runs under
 // Node, and the bundle is built with esbuild `--platform=neutral` plus
@@ -28,10 +29,13 @@ describe("dist/core.mjs bundle sanity (J-012)", () => {
     expect(existsSync(bundlePath)).toBe(true);
   });
 
-  it("is larger than 10 MB (base64 fonts inlined; empty or stub builds fail here)", () => {
+  it("is plausibly sized (catches empty / stub builds)", () => {
     const size = statSync(bundlePath).size;
-    // 10 MB floor — tight enough to catch stubs/truncated builds,
-    // loose enough to allow esbuild output variation between runs.
-    expect(size).toBeGreaterThan(10 * 1024 * 1024);
+    // Lower bound: the bundle must contain the Excalidraw export path
+    // (~1 MB minimum after tree-shaking + minification). Upper bound is
+    // a soft regression sentinel — if core.mjs ever grows back past 10 MB
+    // we've probably regressed the font-split dedup.
+    expect(size).toBeGreaterThan(1024 * 1024);
+    expect(size).toBeLessThan(10 * 1024 * 1024);
   });
 });

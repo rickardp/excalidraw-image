@@ -1,14 +1,23 @@
 #!/usr/bin/env node
 // Scans the installed @excalidraw/excalidraw npm package for WOFF2 assets
 // and emits src/core/font-assets.mjs — a frozen, deterministic map of
-// family → [{ path, base64 }, ...].
+// family → [{ path }, ...].
+//
+// Bytes are NOT inlined here (that approach inflated core.mjs to 21 MB, which
+// blocked crates.io publish — see PHASE0.md and the font-split work). Bytes
+// come from the host at runtime via globalThis.__embeddedFonts, populated by:
+//   * Rust shell: from the excalidraw-image-fonts-{core,cjk} sub-crates
+//     (build-time include_bytes!).
+//   * Deno dev path (src/core/dev.mjs and tests/rust/deno-run.mjs): reads
+//     directly from node_modules/@excalidraw/excalidraw/dist/prod/fonts/
+//     at startup.
 //
 // Re-run whenever @excalidraw/excalidraw is bumped. Output is deterministic:
-// running twice on unchanged input produces no diff (FNT-003 will enforce).
+// running twice on unchanged input produces no diff (FNT-003 enforces).
 //
 // Usage: node src/scripts/build-font-assets.mjs
 
-import { readFile, writeFile, readdir, stat } from "node:fs/promises";
+import { writeFile, readdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -67,53 +76,42 @@ function buildBody(familyMap, fontsDirRel) {
   lines.push(`// Source: ${fontsDirRel}/`);
   lines.push("// Regenerate: node src/scripts/build-font-assets.mjs");
   lines.push("//");
-  lines.push("// Shape:");
-  lines.push("//   FONT_ASSETS[family] = [{ path, base64 }, ...]");
-  lines.push("//   FONT_URL_MAP[url]   = { path, base64 }   (filled at runtime; see note)");
-  lines.push("//   FONT_UNICODE_RANGES[family] = string       (empty; see note)");
+  lines.push("// Shape (METADATA ONLY — bytes come from globalThis.__embeddedFonts):");
+  lines.push("//   FONT_PATHS[family] = [{ path }, ...]");
+  lines.push("//   FONT_URL_MAP[url]  = { path }   (filled at runtime; see note)");
+  lines.push("//   FONT_UNICODE_RANGES[family] = string  (empty; see note)");
 
-  // Count comment (deterministic, no timestamp).
   let total = 0;
   for (const entries of Object.values(familyMap)) total += entries.length;
   lines.push(`// Families: ${Object.keys(familyMap).length}, total WOFF2 files: ${total}`);
   lines.push("");
 
-  lines.push("export const FONT_ASSETS = Object.freeze({");
+  lines.push("export const FONT_PATHS = Object.freeze({");
   const families = Object.keys(familyMap).sort();
   for (const family of families) {
     const entries = familyMap[family].slice().sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
     lines.push(`  ${jsString(family)}: Object.freeze([`);
     for (const e of entries) {
-      lines.push(
-        `    Object.freeze({ path: ${jsString(e.path)}, base64: ${jsString(e.base64)} }),`,
-      );
+      lines.push(`    Object.freeze({ path: ${jsString(e.path)} }),`);
     }
     lines.push("  ]),");
   }
   lines.push("});");
   lines.push("");
 
-  // FONT_URL_MAP: we cannot determine Excalidraw's compiled-in font URLs from
-  // static inspection of the npm dist alone (the URLs are produced by
-  // Excalidraw's font descriptors at runtime). J-004 (fetch-fonts shim) will
-  // populate this map at startup by scanning FONT_ASSETS and matching the
-  // filenames against the URLs Excalidraw actually requests.
-  lines.push("// TODO(J-004): populate at runtime from FONT_ASSETS by matching");
-  lines.push("// filenames against the URLs Excalidraw's font registration produces.");
-  lines.push("// Static inspection of the npm dist is not enough — Excalidraw's font");
-  lines.push("// descriptors are compiled into chunk-*.js and reach their final URL");
-  lines.push("// form only inside the live module graph.");
+  lines.push("// Back-compat aliases. Tests and older code paths reference these names.");
+  lines.push("// FONT_ASSETS is an alias of FONT_PATHS — bytes resolution is the host's job.");
+  lines.push("export const FONT_ASSETS = FONT_PATHS;");
+  lines.push("");
+
+  lines.push("// TODO(J-004): populate at runtime by matching filenames against URLs");
+  lines.push("// Excalidraw's font registration produces.");
   lines.push("export const FONT_URL_MAP = Object.freeze({});");
   lines.push("");
 
-  // FONT_UNICODE_RANGES: not present in the npm dist's CSS. Excalidraw's
-  // runtime reads ranges from its compiled-in font descriptors, which we'll
-  // still get at runtime when exportToSvg() drives the subset pipeline.
-  lines.push("// TODO: Excalidraw's npm dist does not ship a fonts.css with unicode-range");
-  lines.push("// descriptors. The ranges live in the compiled font descriptors and are");
-  lines.push("// applied at runtime inside Fonts.generateFontFaceDeclarations(). For the");
-  lines.push("// CLI we do not need them statically — we feed bytes through fetch() and");
-  lines.push("// Excalidraw's own subset pipeline picks shards via its descriptors.");
+  lines.push("// Excalidraw's npm dist does not ship a fonts.css with unicode-range");
+  lines.push("// descriptors. Excalidraw's runtime reads ranges from its compiled font");
+  lines.push("// descriptors when exportToSvg drives the subset pipeline.");
   lines.push("export const FONT_UNICODE_RANGES = Object.freeze({});");
   lines.push("");
 
@@ -132,13 +130,9 @@ async function main() {
   const familyMap = Object.create(null);
   for (const full of files) {
     const rel = relative(fontsAbs, full);
-    // Family is the top-level directory under the fonts root.
     const family = rel.split(/[\\/]/)[0];
-    const bytes = await readFile(full);
-    const base64 = bytes.toString("base64");
     if (!familyMap[family]) familyMap[family] = [];
-    // Normalize path separators for cross-platform determinism.
-    familyMap[family].push({ path: rel.split("\\").join("/"), base64 });
+    familyMap[family].push({ path: rel.split("\\").join("/") });
   }
 
   const body = buildBody(familyMap, fontsRel);

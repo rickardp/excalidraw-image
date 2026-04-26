@@ -1,0 +1,37 @@
+[package]
+name = "excalidraw-image-fonts-cjk"
+# NOT workspace-inherited. Bumped only when fonts change. Verified by
+# `npm run check:fonts` (src/scripts/check-font-fingerprints.mjs).
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Bundled CJK fonts (Xiaolai) for excalidraw-image"
+repository = "https://github.com/rickardp/excalidraw-image"
+homepage = "https://github.com/rickardp/excalidraw-image"
+authors = ["Rickard"]
+rust-version = "1.75"
+include = [
+    "src/**/*.rs",
+    "build.rs",
+    "fonts/**/*.woff2",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+]
+
+[package.metadata.font-fingerprint]
+# SHA-256 of (sorted relative path + ":" + sha256-hex of contents) lines, joined by "\n".
+# Verified by `npm run check:fonts`. Update this manually when fonts change,
+# alongside a version bump.
+sha256 = "5da4c50a534c9d00607f59741b8691aa2e1144619126306dc740c4cd1a8658e6"
+file_count = 209
+
+[lib]
+path = "src/lib.rs"
+
+[package.metadata.release]
+# This crate is bumped manually only when font contents change (verified by
+# `npm run check:fonts`). `cargo release patch --execute` from the workspace
+# root skips it. CI publishes idempotently — if version unchanged, "already
+# uploaded" counts as success.
+release = false

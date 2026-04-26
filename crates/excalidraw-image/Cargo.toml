@@ -19,6 +19,13 @@ path = "src/main.rs"
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+# CJK support: pulls in the Xiaolai shards via excalidraw-image-fonts-cjk.
+# Without this feature, only Latin-script fonts are bundled, keeping the
+# binary noticeably smaller for users who don't need CJK glyphs.
+cjk = ["dep:excalidraw-image-fonts-cjk"]
+
 [dependencies]
 # Pin deno_core to the F-002 validated version. serde_v8 is re-exported from
 # deno_core in 0.399 — no separate pin needed.
@@ -29,28 +36,32 @@ serde_json = "1"
 anyhow = "1"
 lexopt = "0.3"
 # PNG-001: native PNG rasterization. resvg + tiny-skia render the SVG; usvg
-# parses with a fontdb populated from EMBEDDED_FONTS (build.rs). 0.45 is the
-# latest series whose published API matches the PLAN §5.5 sketch.
+# parses with a fontdb populated from the font sub-crates' raw WOFF2 bytes
+# decompressed at build time.
 resvg = "0.45"
 usvg = "0.45"
 tiny-skia = "0.11"
+# Font byte sources, split for crates.io's per-crate size cap and for opt-in
+# CJK. Always-on Latin core; CJK feature-gated.
+excalidraw-image-fonts-core = { version = "0.1.0", path = "../excalidraw-image-fonts-core" }
+excalidraw-image-fonts-cjk = { version = "0.1.0", path = "../excalidraw-image-fonts-cjk", optional = true }
 
 [build-dependencies]
-# PNG-001: walk the npm font dir at build time to enumerate WOFF2 files for
-# the embedded font table, decompress them once, and emit a single
-# concatenated TTF blob. fontdb (used by usvg/resvg) only consumes raw TTF/
-# OTF — loading WOFF2 bytes silently produces zero faces. Decompressing at
-# build time keeps cold-start fast and keeps the runtime crate dep-free of
-# WOFF2 decoders.
+# build.rs decompresses WOFF2 → TTF for the resvg fontdb. fontdb only consumes
+# raw TTF/OTF; passing WOFF2 silently produces zero faces. We do this at build
+# time once so the binary's cold start doesn't pay the decompress cost.
 #
-# `woofwoof` is the only WOFF2 decoder I tested that successfully decoded
-# the Excalidraw font shards (`woff2` 0.3 fails to compile against current
-# `safer-bytes`; both `woff2-patched` 0.4 and `woff2-no-std` 0.3 panic with
-# "Stream truncated" deep in their `glyf` decoder on Assistant-Bold.woff2 —
-# verified empirically). woofwoof binds the Google C++ woff2 library +
-# pure-Rust `brotli` and decodes all 234 font files cleanly.
-walkdir = "2"
+# `woofwoof` is the only WOFF2 decoder I tested that decoded all 234 Excalidraw
+# font shards cleanly: `woff2` 0.3 fails to compile against current
+# `safer-bytes`; `woff2-patched` 0.4 and `woff2-no-std` 0.3 panic with "Stream
+# truncated" on Assistant-Bold.woff2. woofwoof binds the Google C++ woff2 lib
+# + pure-Rust `brotli`. The C++ build dep is the trade-off; it works on macOS
+# (native) and Linux x64 native runners but blocks naive Linux ARM cross-
+# compile (deferred — see release.yml).
 woofwoof = "1"
+# Sub-crates are also build-deps so build.rs can read FONTS arrays directly.
+excalidraw-image-fonts-core = { version = "0.1.0", path = "../excalidraw-image-fonts-core" }
+excalidraw-image-fonts-cjk = { version = "0.1.0", path = "../excalidraw-image-fonts-cjk", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
