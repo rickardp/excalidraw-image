@@ -113,9 +113,11 @@ the task, and hand off.
 - J-001 shim ordering needs to include WHATWG polyfills before DOM shims. Update P-002 ESLint rule to also forbid direct reads of `atob`/`btoa`/`DOMException`/`URL`/etc. outside `src/core/shims/**`.
 
 ### F-003 — Phase 0 decision one-pager
-**Status:** `todo` **Deps:** F-001, F-002
+**Status:** `done` **Deps:** F-001, F-002
 **Files:** `PHASE0.md` (delete at end of v1, or fold into README)
 **Acceptance:** Documents decisions on package-root-vs-source, the deno_core version pin, Phase 0 size/perf numbers, and any shim surprises discovered. One page.
+
+**Notes:** PHASE0.md committed in commit `c6b4300`. Locks deno_core 0.399.0, package-root npm consumption (no vendoring), PNG via native resvg, ~50 MB target / 60 MB cap, 80 ms cold start observed.
 
 ---
 
@@ -885,14 +887,18 @@ README note deferred to D-001 (the README itself doesn't exist yet).
   flags it via PNG file size).
 
 ### PNG-003 — PNG fixtures and snapshot
-**Status:** `todo` **Deps:** PNG-002
+**Status:** `skip` **Deps:** PNG-002
+
+**Notes:** Deferred to v1.x. PNG output is functional (basic-shapes, text-wrapped, mixed-script all render correctly per PNG-001+002 smoke). Committed binary goldens are brittle to resvg version drift; SSIM-based gate (PNG-004) is the better long-term path. v1 ships with manual visual inspection of the 7 fixtures + the PNG smoke test in `crates/excalidraw-image/tests/png.rs`.
 **Files:** `tests/fixtures/*.png.snapshot` (binary golden)
 **Acceptance:**
 - Golden PNGs generated once; test diffs via pixel-match (tolerance ≤1 per 100k pixels).
 - Covers: basic shapes, text, image, frames.
 
 ### PNG-004 — PNG font fidelity
-**Status:** `todo` **Deps:** PNG-001, FNT-005
+**Status:** `skip` **Deps:** PNG-001, FNT-005
+
+**Notes:** Deferred to v1.x. SSIM image comparison requires a headless-browser PNG oracle (similar infra to FNT-005's font baseline). Combine with PNG-003 in v1.x: render via resvg + render via Playwright over the bundled fonts page, SSIM ≥0.95 per fixture. v1 relies on FNT-005's vector-level metric fidelity (≤0.0005 px) plus manual PNG inspection.
 **Acceptance:** `resvg` picks the correct bundled WOFF2 for each text element via `fontdb` matching. Compare rendered text region against a headless-browser PNG of the same scene: SSIM ≥ 0.95.
 
 ---
@@ -916,14 +922,18 @@ truth for cross builds. Revisit if a contributor needs Linux ARM64 or
 local cross.
 
 ### SZ-002 — Binary size regression test
-**Status:** `blocked` **Deps:** SZ-001
+**Status:** `skip` **Deps:** SZ-001
+
+**Notes:** Deferred to v1.x. Current v1 binary is ~88 MB after PNG (was 60 MB without PNG). SZ-002 makes more sense after a deliberate size-reduction pass: e.g., embed WOFF2 (12 MB) instead of decompressed TTF (23 MB) + decompress at runtime; or split CJK Xiaolai into an opt-in font pack. Until that work happens, a regression budget would just lock in the high-water mark.
 **Acceptance:**
 - `tests/size-budget.json` records per-platform target sizes.
 - CI compares release binary size to budget; fails if >5% over.
 - Initial budget: 50 MB per platform.
 
 ### SZ-003 — Tree-shake audit hooked into CI
-**Status:** `blocked` **Deps:** J-011
+**Status:** `done` **Deps:** J-011
+
+**Notes:** `npm run audit` runs in `.github/workflows/test.yml` on every PR (via `make test` on Linux/macOS; via explicit fallback on Windows where GNU make may be absent). Audit script `src/scripts/metafile-audit.mjs` (J-011) is the gate.
 **Acceptance:** `npm run audit:metafile` runs on every PR; green = no forbidden imports.
 
 ---
