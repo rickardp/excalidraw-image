@@ -1,0 +1,66 @@
+# Homebrew formula stub for `excalidraw-image`.
+#
+# This file is a TEMPLATE. The release workflow (`.github/workflows/release.yml`,
+# `homebrew-bump` job) renders it with concrete values via `sed` and commits
+# the result to `Formula/excalidraw-image.rb` in this repo. Users tap with:
+#
+#   brew tap rickardp/excalidraw-image https://github.com/rickardp/excalidraw-image.git
+#   brew install excalidraw-image
+#
+# Placeholders rendered by the workflow:
+#   0.1.0           the released version (no leading `v`)
+#   https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-aarch64-apple-darwin.tar.gz    full GH Releases URL for aarch64-apple-darwin tarball
+#   714395e04f06c0df123aae7ddcf6d6181d4f41fa77667cce782bae5401e2432f    sha256 of that tarball
+#   https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-x86_64-apple-darwin.tar.gz    full GH Releases URL for x86_64-apple-darwin tarball
+#   cc1c9746c37aed4d4ee629136db81272f81eb27d8bb47982904036ab506895d8    sha256 of that tarball
+#   https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz     full GH Releases URL for x86_64-unknown-linux-gnu tarball
+#   8dd6a0d848c743302e5f65105346fedbc980c6f7bfcff31360acc0bfaa6bcff4     sha256 of that tarball
+#
+# Linux ARM64 is not yet shipped (see PHASE0.md and release.yml header).
+# Add an `on_arm` block here and a matching matrix entry in release.yml when
+# that lands.
+
+class ExcalidrawImage < Formula
+  desc "Convert Excalidraw files to SVG/PNG (self-contained native binary)"
+  homepage "https://github.com/rickardp/excalidraw-image"
+  version "0.1.0"
+  license "MIT"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-aarch64-apple-darwin.tar.gz"
+      sha256 "714395e04f06c0df123aae7ddcf6d6181d4f41fa77667cce782bae5401e2432f"
+    end
+    on_intel do
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-x86_64-apple-darwin.tar.gz"
+      sha256 "cc1c9746c37aed4d4ee629136db81272f81eb27d8bb47982904036ab506895d8"
+    end
+  end
+
+  on_linux do
+    on_intel do
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "8dd6a0d848c743302e5f65105346fedbc980c6f7bfcff31360acc0bfaa6bcff4"
+    end
+    # on_arm: deferred — see release.yml notes on Linux ARM64.
+  end
+
+  def install
+    bin.install "excalidraw-image"
+  end
+
+  test do
+    fixture = (testpath/"basic.excalidraw")
+    fixture.write <<~JSON
+      {"type":"excalidraw","version":2,"source":"https://excalidraw.com",
+       "elements":[{"type":"rectangle","id":"a","x":0,"y":0,
+       "width":100,"height":50,"strokeColor":"#000","backgroundColor":"transparent",
+       "fillStyle":"solid","strokeWidth":1,"strokeStyle":"solid","roughness":1,
+       "opacity":100,"angle":0,"seed":1,"version":1,"versionNonce":1,
+       "isDeleted":false,"groupIds":[],"frameId":null,"roundness":null,
+       "boundElements":null,"updated":0,"link":null,"locked":false}],
+       "appState":{"viewBackgroundColor":"#ffffff"},"files":{}}
+    JSON
+    assert_match "<svg", shell_output("#{bin}/excalidraw-image #{fixture}")
+  end
+end
