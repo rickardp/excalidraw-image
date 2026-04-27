@@ -70,6 +70,9 @@ pub enum InputKind {
 /// (extract or render) does the real validation and returns a typed error
 /// if the bytes don't actually contain what the prefix promised.
 pub fn sniff(bytes: &[u8]) -> Result<InputKind> {
+    if bytes.is_empty() {
+        bail!("input is empty (expected .excalidraw JSON, .excalidraw.svg, or .excalidraw.png)");
+    }
     const PNG_SIG: &[u8] = b"\x89PNG\r\n\x1a\n";
     if bytes.starts_with(PNG_SIG) {
         return Ok(InputKind::Png);
@@ -85,7 +88,7 @@ pub fn sniff(bytes: &[u8]) -> Result<InputKind> {
         _ => {
             let head = &bytes[..bytes.len().min(8)];
             bail!(
-                "input format not recognized (expected .excalidraw JSON, SVG, or PNG); first bytes: {}",
+                "input format not supported (expected .excalidraw JSON, .excalidraw.svg, or .excalidraw.png); first bytes: {}",
                 hex_preview(head)
             )
         }
@@ -169,9 +172,21 @@ pub fn extract_from_png(bytes: &[u8]) -> Result<String> {
         }
         let len = u32::from_be_bytes([cur[0], cur[1], cur[2], cur[3]]) as usize;
         let chunk_type = &cur[4..8];
-        let data_end = 8 + len;
-        if cur.len() < data_end + 4 {
-            bail!("PNG chunk is truncated");
+        // Use checked arithmetic so a pathological length (close to usize::MAX
+        // on a 32-bit target, or a malicious file claiming a chunk longer
+        // than the universe) doesn't wrap and slip past the bounds check.
+        let data_end = 8usize
+            .checked_add(len)
+            .ok_or_else(|| anyhow!("PNG chunk length is implausibly large ({len} bytes)"))?;
+        let need = data_end
+            .checked_add(4)
+            .ok_or_else(|| anyhow!("PNG chunk length is implausibly large ({len} bytes)"))?;
+        if cur.len() < need {
+            bail!(
+                "PNG chunk is truncated (chunk declares {len} bytes; \
+                 only {} remain after header)",
+                cur.len().saturating_sub(8)
+            );
         }
         let data = &cur[8..data_end];
         if chunk_type == b"tEXt" {
@@ -190,7 +205,7 @@ pub fn extract_from_png(bytes: &[u8]) -> Result<String> {
                  (reached IEND without a `application/vnd.excalidraw+json` tEXt chunk)."
             );
         }
-        cur = &cur[data_end + 4..]; // +4 CRC
+        cur = &cur[need..];
     }
 }
 
@@ -300,9 +315,50 @@ mod tests {
     }
 
     #[test]
-    fn sniff_unknown() {
-        assert!(sniff(b"GIF89a").is_err());
-        assert!(sniff(b"").is_err());
+    fn sniff_empty_input() {
+        let err = sniff(b"").unwrap_err().to_string();
+        assert!(err.contains("empty"), "expected 'empty' in error: {err}");
+    }
+
+    #[test]
+    fn sniff_only_bom_or_whitespace_errors() {
+        // BOM only — no actual content.
+        let err = sniff(&[0xEF, 0xBB, 0xBF]).unwrap_err().to_string();
+        assert!(err.contains("not supported"), "{err}");
+        // Whitespace only.
+        let err = sniff(b"   \n\t\r\n  ").unwrap_err().to_string();
+        assert!(err.contains("not supported"), "{err}");
+    }
+
+    #[test]
+    fn sniff_unknown_binary_formats_have_hex_preview() {
+        // Foreign image formats — we recognize the tag well enough to know
+        // it isn't ours, so we reject with a "not supported" message and
+        // a hex preview of the leading bytes.
+        for sample in [
+            &b"GIF89a"[..],
+            &[0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0][..], // JPEG SOI + APP0
+            b"BM\x00\x00\x00\x00",                     // BMP
+            b"\x00\x00\x00\x20ftypiso6",               // MP4-like
+            // Note: a literal `<` byte is enough to claim Svg, so we can't
+            // use a UTF-16-starting-with-`<` sample here — the byte view
+            // would still match our text-format check, which is fine: we
+            // route it onward and the SVG parser/extractor reports the real
+            // problem (no embedded scene).
+        ] {
+            let err = sniff(sample).unwrap_err().to_string();
+            assert!(
+                err.contains("not supported"),
+                "expected 'not supported' for {:?}, got: {err}",
+                sample
+            );
+            // The error should include a hex preview to help the user diagnose.
+            assert!(
+                err.contains("first bytes:"),
+                "expected hex preview for {:?}, got: {err}",
+                sample
+            );
+        }
     }
 
     #[test]
@@ -439,5 +495,208 @@ mod tests {
 
         let got = extract_from_png(&png).unwrap();
         assert_eq!(got, scene);
+    }
+
+    // ---- Corruption / edge-case tests ------------------------------------
+
+    /// Wrap `b64_payload` (whatever bytes the user supplied) into the SVG
+    /// carrier we recognize. Always uses payload-version 2 so the test
+    /// helper isn't coupled to the v1 legacy path.
+    fn make_svg_with_payload(b64_payload: &str) -> String {
+        format!(
+            "<svg><metadata>\
+             <!-- payload-type:application/vnd.excalidraw+json -->\
+             <!-- payload-version:2 -->\
+             <!-- payload-start -->{b64_payload}<!-- payload-end --></metadata></svg>"
+        )
+    }
+
+    #[test]
+    fn extract_from_svg_marker_present_but_payload_start_missing() {
+        // Has the `payload-type` marker (so we know it claims to be ours)
+        // but is missing `<!-- payload-start -->` — must error specifically.
+        let svg = "<svg><metadata>\
+                   <!-- payload-type:application/vnd.excalidraw+json -->\
+                   </metadata></svg>";
+        let err = extract_from_svg(svg).unwrap_err().to_string();
+        assert!(
+            err.contains("payload-start"),
+            "expected error to name `payload-start`: {err}"
+        );
+    }
+
+    #[test]
+    fn extract_from_svg_marker_present_but_payload_end_missing() {
+        let svg = "<svg><metadata>\
+                   <!-- payload-type:application/vnd.excalidraw+json -->\
+                   <!-- payload-start -->somebase64data\
+                   </metadata></svg>";
+        let err = extract_from_svg(svg).unwrap_err().to_string();
+        assert!(
+            err.contains("payload-end"),
+            "expected error to name `payload-end`: {err}"
+        );
+    }
+
+    #[test]
+    fn extract_from_svg_corrupt_base64_errors_clearly() {
+        // `===!!!` is not base64.
+        let svg = make_svg_with_payload("===!!!definitely-not-base64===");
+        let err = extract_from_svg(&svg).unwrap_err().to_string();
+        assert!(err.contains("base64"), "{err}");
+    }
+
+    #[test]
+    fn extract_from_svg_corrupt_envelope_json_errors_clearly() {
+        // Valid base64 of "this is not json" → we get past base64 decode,
+        // then trip on serde_json.
+        let b64 = B64.encode(b"this is not json");
+        let svg = make_svg_with_payload(&b64);
+        let err = extract_from_svg(&svg).unwrap_err().to_string();
+        assert!(err.contains("envelope JSON"), "{err}");
+    }
+
+    #[test]
+    fn extract_from_svg_envelope_with_unknown_encoding_errors_clearly() {
+        // Envelope JSON parses fine, but `encoding` is something we don't
+        // know how to handle. Today only `bstring` is supported.
+        let envelope = serde_json::json!({
+            "version": "1",
+            "encoding": "rot13",
+            "compressed": false,
+            "encoded": "abc",
+        })
+        .to_string();
+        let env_bytes: Vec<u8> = envelope.chars().map(|c| c as u8).collect();
+        let svg = make_svg_with_payload(&B64.encode(env_bytes));
+        let err = extract_from_svg(&svg).unwrap_err().to_string();
+        assert!(
+            err.contains("unsupported envelope encoding") && err.contains("rot13"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn extract_from_svg_envelope_compressed_but_garbage_inflate_errors() {
+        // `encoded` claims to be deflated bytes but is just random text.
+        // ZlibDecoder should refuse with our "failed to inflate" context.
+        let envelope = serde_json::json!({
+            "version": "1",
+            "encoding": "bstring",
+            "compressed": true,
+            "encoded": "not-actually-deflated-data",
+        })
+        .to_string();
+        let env_bytes: Vec<u8> = envelope.chars().map(|c| c as u8).collect();
+        let svg = make_svg_with_payload(&B64.encode(env_bytes));
+        let err = extract_from_svg(&svg).unwrap_err().to_string();
+        assert!(err.contains("inflate"), "{err}");
+    }
+
+    #[test]
+    fn extract_from_svg_envelope_missing_encoded_and_no_self_describing_type() {
+        // No `encoded`, and `type` isn't `excalidraw` either — should bail
+        // rather than silently returning the envelope.
+        let envelope = serde_json::json!({
+            "version": "1",
+            "encoding": "bstring",
+            "compressed": false,
+            "type": "library",
+        })
+        .to_string();
+        let env_bytes: Vec<u8> = envelope.chars().map(|c| c as u8).collect();
+        let svg = make_svg_with_payload(&B64.encode(env_bytes));
+        let err = extract_from_svg(&svg).unwrap_err().to_string();
+        assert!(err.contains("missing `encoded`"), "{err}");
+    }
+
+    #[test]
+    fn extract_from_svg_self_describing_excalidraw_envelope_passes_through() {
+        // Older format: envelope IS the scene (no `encoded`, `type` is
+        // `excalidraw`). Excalidraw's own decoder handles this branch; we
+        // do too by returning the envelope JSON unchanged.
+        let scene = serde_json::json!({
+            "type": "excalidraw",
+            "version": 2,
+            "elements": [],
+            "appState": {},
+        })
+        .to_string();
+        let env_bytes: Vec<u8> = scene.chars().map(|c| c as u8).collect();
+        let svg = make_svg_with_payload(&B64.encode(env_bytes));
+        let got = extract_from_svg(&svg).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&got).unwrap();
+        assert_eq!(parsed["type"], "excalidraw");
+    }
+
+    #[test]
+    fn extract_from_png_no_signature_errors_clearly() {
+        // Bytes that don't start with the PNG magic — sniff would never
+        // route us here, but the function itself should reject too.
+        let err = extract_from_png(b"not a png at all").unwrap_err().to_string();
+        assert!(err.contains("not a PNG"), "{err}");
+    }
+
+    #[test]
+    fn extract_from_png_truncated_after_signature_errors_clearly() {
+        // Just the 8-byte signature, nothing else. The chunk-header read
+        // would underflow; we should bail with our friendly message.
+        let err = extract_from_png(b"\x89PNG\r\n\x1a\n").unwrap_err().to_string();
+        assert!(err.contains("does not contain"), "{err}");
+    }
+
+    #[test]
+    fn extract_from_png_chunk_lies_about_length_errors_clearly() {
+        // Signature + a chunk header that says it's u32::MAX bytes long,
+        // padded out to ≥12 bytes after the signature so the up-front
+        // `cur.len() < 12` guard doesn't short-circuit. We want to exercise
+        // the bounds-check on `8 + len + 4`, which must reject without
+        // overflowing or panicking.
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        png.extend_from_slice(&u32::MAX.to_be_bytes()); // len
+        png.extend_from_slice(b"tEXt"); // type
+        png.extend_from_slice(&[0; 4]); // pretend CRC, brings us to 12 bytes
+        let err = extract_from_png(&png).unwrap_err().to_string();
+        assert!(
+            err.contains("truncated") || err.contains("implausibly large"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn extract_from_png_tEXt_with_other_keyword_keeps_searching_then_fails() {
+        // tEXt chunk with a foreign keyword — we must skip it, not match
+        // it as ours, and ultimately error at IEND with the missing-scene
+        // message.
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        let foreign = b"Author\x00Some Author".to_vec();
+        png.extend_from_slice(&(foreign.len() as u32).to_be_bytes());
+        png.extend_from_slice(b"tEXt");
+        png.extend_from_slice(&foreign);
+        png.extend_from_slice(&[0; 4]); // CRC
+        png.extend_from_slice(&0u32.to_be_bytes());
+        png.extend_from_slice(b"IEND");
+        png.extend_from_slice(&[0; 4]);
+
+        let err = extract_from_png(&png).unwrap_err().to_string();
+        assert!(err.contains("does not contain"), "{err}");
+    }
+
+    #[test]
+    fn extract_from_png_tEXt_without_separator_is_silently_skipped() {
+        // Malformed tEXt chunk (no \0 separator) — we should treat it as
+        // "not ours" and continue rather than panicking.
+        let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+        let bad = b"no-separator-here".to_vec();
+        png.extend_from_slice(&(bad.len() as u32).to_be_bytes());
+        png.extend_from_slice(b"tEXt");
+        png.extend_from_slice(&bad);
+        png.extend_from_slice(&[0; 4]);
+        png.extend_from_slice(&0u32.to_be_bytes());
+        png.extend_from_slice(b"IEND");
+        png.extend_from_slice(&[0; 4]);
+
+        let err = extract_from_png(&png).unwrap_err().to_string();
+        assert!(err.contains("does not contain"), "{err}");
     }
 }

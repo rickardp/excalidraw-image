@@ -27,6 +27,34 @@ fn repo_root() -> PathBuf {
 }
 
 #[test]
+fn no_args_prints_help_without_blocking_on_stdin() {
+    // Bare `excalidraw-image` should show the help page and exit 0, NOT
+    // silently read stdin. Stdin is intentionally piped from /dev/null so
+    // the test deadlocks if the binary ever falls back to "read stdin
+    // when no positional input is given".
+    let out = Command::new(bin())
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "bare invocation should exit 0; stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        stdout.contains("USAGE:") && stdout.contains("excalidraw-image"),
+        "bare invocation should print the help page; got: {stdout:.200}"
+    );
+    assert!(
+        out.stderr.is_empty(),
+        "bare invocation should not write to stderr; got: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+#[test]
 fn missing_file_exits_one_with_path_in_stderr() {
     let ghost = "/tmp/this-path-does-not-exist-excalidraw-image-xyz.excalidraw";
     let out = Command::new(bin()).arg(ghost).output().unwrap();
@@ -83,6 +111,109 @@ fn broken_json_exits_one_with_error_prefix() {
         err.starts_with("error:"),
         "stderr should start with `error:`. got: {err}"
     );
+}
+
+#[test]
+fn empty_stdin_exits_one_with_clear_message() {
+    // Empty input must not be treated as JSON / SVG / PNG. Sniff should
+    // report "input is empty" with exit 1.
+    let mut child = Command::new(bin())
+        .arg("-")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    drop(child.stdin.take()); // close stdin so the read returns 0 bytes
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("empty"), "stderr should say 'empty': {err}");
+}
+
+#[test]
+fn unsupported_input_format_exits_one_with_hex_preview() {
+    // GIF magic. Not a format we support — must error cleanly with the
+    // "not supported" message and a hex preview of the leading bytes.
+    let mut child = Command::new(bin())
+        .arg("-")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"GIF89a\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("not supported"), "{err}");
+    assert!(err.contains("first bytes:"), "{err}");
+}
+
+#[test]
+fn svg_input_without_embedded_scene_exits_one_with_clear_message() {
+    // A perfectly valid SVG, but no Excalidraw payload. Reverse path must
+    // reject — we are not a general SVG reader.
+    let mut child = Command::new(bin())
+        .arg("-")
+        .arg("--format")
+        .arg("excalidraw")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"<svg xmlns=\"http://www.w3.org/2000/svg\"><rect/></svg>")
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("does not contain"), "{err}");
+    assert!(
+        err.contains("excalidraw-image only extracts"),
+        "stderr should explain we only extract scenes we put there: {err}"
+    );
+}
+
+#[test]
+fn png_input_without_embedded_scene_exits_one_with_clear_message() {
+    // Smallest valid PNG (sig + IHDR + IDAT + IEND, no tEXt) so sniff
+    // routes us through the extractor; it must reject for missing scene.
+    let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+    png.extend_from_slice(&13u32.to_be_bytes());
+    png.extend_from_slice(b"IHDR");
+    png.extend_from_slice(&[0; 13]);
+    png.extend_from_slice(&[0; 4]);
+    png.extend_from_slice(&0u32.to_be_bytes());
+    png.extend_from_slice(b"IDAT");
+    png.extend_from_slice(&[0; 4]);
+    png.extend_from_slice(&0u32.to_be_bytes());
+    png.extend_from_slice(b"IEND");
+    png.extend_from_slice(&[0; 4]);
+
+    let mut child = Command::new(bin())
+        .arg("-")
+        .arg("--format")
+        .arg("excalidraw")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+    child.stdin.as_mut().unwrap().write_all(&png).unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("does not contain"), "{err}");
 }
 
 #[test]

@@ -324,7 +324,14 @@ fn parse_inner(args: impl IntoIterator<Item = OsString>) -> Result<Args> {
         }
     }
 
-    out.input = input.unwrap_or_else(|| "-".to_string());
+    // No positional input is the friendly "show help" case. `-` is the
+    // only way to ask for stdin — keeps the docs honest and stops the
+    // binary from blocking on an empty terminal when invoked bare.
+    let Some(input_path) = input else {
+        print!("{HELP_TEXT}");
+        std::process::exit(0);
+    };
+    out.input = input_path;
 
     // Output-format resolution at parse time:
     //   1. explicit `--format` wins
@@ -455,9 +462,13 @@ mod tests {
     }
 
     #[test]
-    fn defaults_when_no_input_or_output() {
-        let a = parse_strs(&[]).unwrap();
-        assert_eq!(a.input, "-");
+    fn defaults_when_only_input_given() {
+        // Bare `excalidraw-image` (no positional) prints help and exits, so
+        // we can't unit-test that branch directly — covered by the smoke
+        // test instead. Here we assert the default field values when the
+        // user passes only the input.
+        let a = parse_strs(&["scene.excalidraw"]).unwrap();
+        assert_eq!(a.input, "scene.excalidraw");
         assert_eq!(a.output, "-");
         assert_eq!(a.format, None); // resolved by main.rs after sniffing input
         assert!(a.background);
