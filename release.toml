@@ -29,6 +29,15 @@ tag-name = "v{{version}}"
 tag-message = "Release v{{version}}"
 pre-release-commit-message = "chore: release v{{version}}"
 
+# Take the per-package commit path, not the workspace-consolidated one.
+# In cargo-release 1.1.2 the workspace path only fills `{{version}}` when
+# every published package shares a version (set via `shared-version =
+# "<group>"`), and ours don't (excalidraw-image is at 0.1.x; the font
+# sub-crates are at 1.0.0). Without this flag the bump commit lands as
+# the literal string `chore: release v{{version}}` — observed cutting
+# v0.1.1. The tag templating uses a different code path and is unaffected.
+consolidate-commits = false
+
 # Guardrail: releases must originate from main.
 allow-branch = ["main"]
 
