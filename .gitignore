@@ -2,6 +2,9 @@
 dist/
 target/
 
+# Deno lockfile — regenerated on `deno test`; not pinned in CI.
+deno.lock
+
 # Dependency directories
 node_modules/
 
