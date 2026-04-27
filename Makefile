@@ -1,8 +1,7 @@
 # excalidraw-image — top-level Makefile.
 #
-# Targets either run their real command or a guarded placeholder that prints
-# "not-yet-implemented (<task-id>)" and exits 0 until the downstream tooling
-# (J-010, FNT-001, R-007, etc.) lands. See PLAN.md §8.1 and TASKS.md P-004.
+# Build, test, and release helpers for the JS bundle, Rust shell, fixtures,
+# and parity gates.
 
 .DEFAULT_GOAL := help
 
@@ -50,7 +49,7 @@ dev:
 rust:
 	cargo build --release -p excalidraw-image
 
-# R-007: Deno-vs-Rust byte-identity gate (PLAN §8.2). The real gate lives in
+# Deno-vs-Rust byte-identity gate. The real gate lives in
 # `crates/excalidraw-image/tests/parity.rs`; it spawns `deno run
 # tests/rust/deno-run.mjs <fixture>` and the release binary per fixture and
 # compares stdout byte-for-byte. Depends on `core` because both hosts load

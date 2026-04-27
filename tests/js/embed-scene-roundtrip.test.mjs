@@ -27,7 +27,7 @@
 // Known upstream normalizations we deliberately do NOT assert against:
 //   - `restoreElements` (applied on reopen, not on our decode) fills in
 //     `version`, `versionNonce`, `lineHeight`, and other derived fields
-//     with defaults — PLAN.md §11 risk 4.
+//     with defaults — the implementation notes risk 4.
 //   - The embedded scene's `appState` may carry additional export-related
 //     state (exportBackground, viewBackgroundColor, etc.) that the caller
 //     didn't set.
@@ -136,7 +136,7 @@ describe("E-003 embed-scene round-trip", () => {
       // (Not full deep-equal: upstream `restoreElements` on load will fill
       // derived fields — `version`, `versionNonce`, `lineHeight` defaults,
       // etc. — which are NOT in our hand-authored fixtures. Those
-      // differences are expected per PLAN.md §11 risk 4 and would cause
+      // differences are expected per the implementation notes risk 4 and would cause
       // spurious failures here.)
       for (let i = 0; i < original.elements.length; i++) {
         const o = original.elements[i];

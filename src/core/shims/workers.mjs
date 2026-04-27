@@ -5,7 +5,7 @@
 // captures `shouldUseWorkers = typeof Worker !== "undefined"` as `false` at
 // module evaluation time and runs subsetting in-process.
 //
-// See PLAN.md §4.2 and upstream SVG_EXPORT.md §3.4 for the rationale.
+// See the implementation notes and upstream SVG_EXPORT.md §3.4 for the rationale.
 //
 // Host-neutral: `deno_core` does not define `Worker`, so this shim is a no-op
 // under the shipping host. Deno (dev) DOES define `Worker`, so the dev-loop

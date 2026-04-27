@@ -6,7 +6,7 @@
 // parses the size and first family, loads the matching bundled WOFF2 from
 // `font-assets.mjs`, and measures the run via fontkit's `layout`.
 //
-// Host-neutrality notes (see PLAN.md §4.2 "portability contract" and
+// Host-neutrality notes (see the implementation notes "portability contract" and
 // eslint.config.js):
 //   - No `Buffer`, no `node:*`, no filesystem.
 //   - fontkit 2.0.4's `create()` feeds its argument straight into a
@@ -25,7 +25,7 @@
 //   even though the family's shard[0] may be a symbols-only subset.
 //
 // Minimal fallback policy (full policy lands in FNT-009):
-//   Helvetica → Liberation (PLAN §4A.5). Any other unknown family →
+//   Helvetica → Liberation (the implementation notes). Any other unknown family →
 //   Excalifont. If Excalifont itself is missing (no fonts loaded at all),
 //   return the degenerate `text.length * 8` so callers never throw.
 
@@ -83,7 +83,7 @@ function _stripQuotes(s) {
 
 function _bytesForPath(path) {
   // Bytes are populated by the host (Rust shell or Deno dev path) on
-  // globalThis.__embeddedFonts before render. See PLAN.md §4A.7.
+  // globalThis.__embeddedFonts before render. See the implementation notes
   const map = globalThis.__embeddedFonts;
   if (!map) return null;
   const v = map[path];

@@ -1,6 +1,6 @@
 // tests/js/font-emoji-local-only.test.mjs — FNT-010
 //
-// Emoji policy (PLAN §4A.6):
+// Emoji policy (the implementation notes):
 //   - No `@font-face` is emitted for "Segoe UI Emoji" (local-only upstream
 //     — Excalidraw's Emoji/ directory contains only `src: local(...)`
 //     descriptors with no WOFF2 bytes to embed). Same for Helvetica.
@@ -60,7 +60,7 @@ describe("FNT-010 emoji local-only handling", () => {
   });
 
   it("does NOT emit an @font-face for Helvetica (other local-only family)", () => {
-    // Same policy as emoji (PLAN §4A.6): Helvetica upstream is a
+    // Same policy as emoji (the implementation notes): Helvetica upstream is a
     // local-only descriptor with no WOFF2 to embed. Metrics are routed
     // to Liberation Sans via the T-001 alias, but no @font-face rule
     // should name Helvetica.

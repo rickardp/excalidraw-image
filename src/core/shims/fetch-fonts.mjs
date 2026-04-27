@@ -8,7 +8,7 @@
 //   2. Delegates `data:` URLs to the previous (host) fetch if present, or
 //      parses them inline to a Response-like fallback.
 //   3. Throws `Error("network fetch not allowed in CLI: <url>")` for any
-//      other URL — see PLAN.md §4.2 and §4A.7.
+//      other URL — see the implementation notes and §4A.7.
 //
 // Host-neutral: no node:*, no fs, no Buffer. Idempotent — calling install
 // twice leaves a single wrapper in place.

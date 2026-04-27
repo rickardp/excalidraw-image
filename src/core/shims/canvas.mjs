@@ -1,6 +1,6 @@
 // src/core/shims/canvas.mjs
 //
-// Canvas shim. See PLAN.md §4.2 and upstream SVG_EXPORT.md §3.2 for the
+// Canvas shim. See the implementation notes and upstream SVG_EXPORT.md §3.2 for the
 // measurement contract. Two measurement paths exist in Excalidraw's export
 // code: the `CanvasTextMetricsProvider` (overridable via
 // `setCustomTextMetricsProvider`) and a direct call in `scene/export.ts` for

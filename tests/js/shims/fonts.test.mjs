@@ -1,6 +1,6 @@
 // Unit tests for src/core/shims/fonts.mjs (J-003).
 // Vitest; the dom shim must be installed first — fonts.mjs guards on
-// `typeof document === "undefined"`. See PLAN.md §4.2 and §4A.6.
+// `typeof document === "undefined"`. See the implementation notes and §4A.6.
 
 import { describe, it, expect, beforeAll } from "vitest";
 

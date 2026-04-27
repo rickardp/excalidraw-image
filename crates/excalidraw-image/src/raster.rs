@@ -7,7 +7,7 @@
 // bytes the JS side base64-embeds, so fontdb's matching agrees with the
 // `@font-face` declarations in the SVG `<defs>`.
 //
-// PLAN §5.5 has the design sketch. Notes:
+// the implementation notes has the design sketch. Notes:
 //   * No system-fonts path. Fonts are exclusively the embedded set; the
 //     CLI must render identically across machines.
 //   * `RasterOptions` mirrors the subset of `Args` that affects rasterization

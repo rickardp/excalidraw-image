@@ -2,7 +2,7 @@
 //
 // Verifies that our FontkitTextMetricsProvider agrees with Chromium's
 // native canvas.measureText on a fixed test string per family. This is
-// the fontkit-vs-browser metrics parity gate from PLAN.md §4A.8 gate 3.
+// the fontkit-vs-browser metrics parity gate from the implementation notes gate 3.
 //
 // The comparison is offline: this test never launches a browser. It reads
 // the committed tests/fixtures/browser-font-baseline.json (produced by

@@ -1,6 +1,6 @@
 // src/core/shims/fonts.mjs
 //
-// Installs minimal FontFace + document.fonts stubs. See PLAN.md §4.2 and §4A.6.
+// Installs minimal FontFace + document.fonts stubs. See the implementation notes and §4A.6.
 // We do NOT actually load or measure fonts here — that is Excalidraw's concern
 // via its own subsetter and fontkit. This shim just has to preserve descriptors
 // verbatim and satisfy the FontFaceSet surface that Excalidraw's export path

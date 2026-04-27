@@ -512,10 +512,13 @@ name = "excalidraw-image"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
+ "crc32fast",
  "deno_core",
  "excalidraw-image-fonts-cjk",
  "excalidraw-image-fonts-cjk-extra",
  "excalidraw-image-fonts-core",
+ "flate2",
  "lexopt",
  "resvg",
  "serde",

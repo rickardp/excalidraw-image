@@ -1,7 +1,7 @@
 // tests/js/font-strict-fonts.test.mjs — FNT-009
 //
 // Exercise the `opts.strictFonts: true` flag added to src/core/index.mjs.
-// Policy (PLAN §4A.5):
+// Policy (the implementation notes):
 //   - Default (permissive): unknown numeric fontFamily IDs fall back to
 //     Excalifont metrics without error. The scene still renders; the
 //     emitted `font-family` string may contain arbitrary names.
@@ -15,7 +15,7 @@
 // UI Emoji"), not to an arbitrary name. The cleanest way to inject an
 // unknown first family into the SVG is to set `fontFamily` to an unknown
 // numeric id (e.g. 99) — upstream emits "Segoe UI Emoji" as first family,
-// which is NOT in the allowlist (it's never bundled; PLAN §4A.6). That
+// which is NOT in the allowlist (it's never bundled; the implementation notes). That
 // path exercises the same guard the task describes.
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -72,7 +72,7 @@ const HELVETICA_SCENE = {
 // recognise. Upstream's getFontFamilyString falls back to Segoe UI Emoji
 // for unknown IDs (see packages/common/src/utils.ts:94, the for-of over
 // FONT_FAMILY only hits entries 1..10). "Segoe UI Emoji" is NOT in our
-// allowlist (PLAN §4A.6 marks it as local-only), so strictFonts must
+// allowlist (the implementation notes marks it as local-only), so strictFonts must
 // reject.
 const UNKNOWN_FONT_SCENE = {
   ...HELVETICA_SCENE,

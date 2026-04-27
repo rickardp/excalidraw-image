@@ -1,4 +1,4 @@
-// FNT-004 — Subset round-trip test per family (PLAN §4A.3, §4A.8 gate 2).
+// FNT-004 — Subset round-trip test per family (the implementation notes, §4A.8 gate 2).
 //
 // For every supported family in FONT_ASSETS, exercise the full Excalidraw
 // subsetting pipeline end-to-end:

@@ -10,7 +10,7 @@
 //
 // Location: `crates/excalidraw-image/tests/smoke.rs`, not the repo-level
 // `tests/rust/` directory — cargo integration tests must live inside the
-// owning crate. PLAN §7's `tests/rust/` is retained as the home for
+// owning crate. the implementation notes `tests/rust/` is retained as the home for
 // non-crate-owned harness files (e.g. `deno-run.mjs`).
 
 use std::path::PathBuf;

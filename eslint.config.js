@@ -1,4 +1,4 @@
-// Flat config (ESLint >=9). Host-neutrality for src/core/ — see PLAN.md §2 and §4.
+// Flat config (ESLint >=9). Host-neutrality for src/core/.
 // The JS core must be runnable unchanged under Deno (dev) and deno_core (ship).
 // Only src/core/dev.mjs may touch Deno.* — it is a Deno-only dev entry, not shipped.
 

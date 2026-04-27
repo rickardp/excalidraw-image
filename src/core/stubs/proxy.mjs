@@ -7,7 +7,7 @@
 // those packages actually loading at runtime.
 //
 // Shape (lifted verbatim from the working F-001 spike — spike/build.mjs
-// virtual `stub-virtual` loader — PHASE0.md §"Finding A"):
+// virtual `stub-virtual` loader — the feasibility spike notes):
 //
 // - `default` export is a callable `Proxy`. Every property access returns
 //   the same Proxy (so `React.memo`, `React.forwardRef`, `jsx`, `atom`,

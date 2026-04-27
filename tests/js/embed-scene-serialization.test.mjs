@@ -2,7 +2,7 @@
 //
 // E-002 hardens the E-001 marker-presence gate by inspecting the
 // internal structure of the <metadata> block that carries the embedded
-// scene. This is PLAN.md §11 risk 6: linkedom could in principle collapse
+// scene. This is the implementation notes risk 6: linkedom could in principle collapse
 // comments, reorder children, or mangle text-node whitespace during
 // outerHTML serialization. If that happens, the Excalidraw round-trip
 // decoder (which this test does NOT run — E-003 owns that) will fail

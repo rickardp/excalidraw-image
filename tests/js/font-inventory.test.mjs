@@ -1,4 +1,4 @@
-// FNT-003 — Font inventory integrity gate (PLAN §4A.8 gate 1).
+// FNT-003 — Font inventory integrity gate (the implementation notes gate 1).
 //
 // Verifies that every WOFF2 file in
 //   node_modules/@excalidraw/excalidraw/dist/prod/fonts/

@@ -3,8 +3,7 @@
 Feasibility gate for the `excalidraw-image` project, Rust side. This directory
 answers one question: can we take F-001's `spike/core.mjs` bundle, load it into
 a statically-linked `deno_core` binary, and produce **byte-identical** output
-to the Deno dev-loop host, under the size and cold-start budgets in
-`PLAN.md` §3.2?
+to the Deno dev-loop host, under the original size and cold-start budgets?
 
 **Verdict: hypothesis holds, with caveats.** See Verdict below.
 
@@ -12,7 +11,7 @@ to the Deno dev-loop host, under the size and cold-start budgets in
 
 | File                | Role |
 |---------------------|------|
-| `Cargo.toml`        | Pins `deno_core = "0.399"` (latest stable as of 2026-04-24). Release profile matches `PLAN.md` §5.6. |
+| `Cargo.toml`        | Pins `deno_core = "0.399"` (latest stable as of 2026-04-24). Release profile matches the optimized binary profile used by the main crate. |
 | `src/main.rs`       | Minimal host: loads bundle, stashes scene JSON on `globalThis`, calls `__render`, awaits, prints the SVG. |
 | `src/polyfills.js`  | Spike-only JS polyfills for globals Deno ships but `deno_core` does not (atob/btoa, DOMException, URL, TextEncoder/Decoder, Event/EventTarget, performance, setTimeout). |
 | `target/`           | `cargo build` output (gitignored). |
@@ -40,7 +39,7 @@ All measurements taken on macOS Darwin 25.4.0, arm64 (Apple Silicon),
 `cargo 1.x` default toolchain, bundle built from `@excalidraw/excalidraw
 0.18.1`.
 
-| Metric                                | Value                    | PLAN §3.2 budget | Pass |
+| Metric                                | Value                    | Budget | Pass |
 |---------------------------------------|-------------------------:|-----------------:|:----:|
 | Release binary size                   | 45,744,528 B = **43.6 MB** | < 60 MB          | yes  |
 | Cold-start wall-clock (median of 5)   | **0.080 s = 80 ms**      | < 400 ms         | yes  |
@@ -61,9 +60,9 @@ consecutive runs, all 0.08s. No warm-up, no snapshot.
 - `serde_json = "1"`.
 - `anyhow = "1"`.
 
-Note: `PLAN.md` §3.2 references `deno_core = "0.318"`. That version is ~18
-months old (at 2026-04-24). The API has changed materially (see below);
-R-001 should pin **0.399** or newer.
+The older reference sketch used `deno_core = "0.318"`. That version is ~18
+months old as of 2026-04-24. The API has changed materially (see below), so
+the main crate pins **0.399** or newer.
 
 ## API deltas vs the prompt's reference code
 
@@ -125,10 +124,10 @@ bundle fails:
   clipboard/file-error paths reference the class at import time (read by a
   closure, not actually thrown in the basic-shapes path).
 
-**Implication for R-001.** The "host-neutral JS bundle" discipline asserted
-in `PLAN.md` §4 (the lint rule forbids `node:*` / `Bun.*` / `Deno.*`) is
-necessary but not sufficient to guarantee portability — the bundle also
-tacitly depends on WHATWG globals that Deno provides but bare V8 does not.
+**Implication for the production shell.** The "host-neutral JS bundle"
+discipline enforced by lint rules is necessary but not sufficient to
+guarantee portability — the bundle also tacitly depends on WHATWG globals
+that Deno provides but bare V8 does not.
 Two options for R-001:
 
 - **(A) JS-side polyfills in `src/core/shims/install.mjs`.** Enumerate the
@@ -198,7 +197,7 @@ this in R-004.
 
 None. Clean build.
 
-## Verdict — PLAN §3.2 acceptance criteria
+## Verdict — the original implementation plan acceptance criteria
 
 - [x] **Byte-identical output.** SHA-256 matches Deno reference exactly
   (`21d5511f5e79928e8a9b30f9a71279722b562a969626a625666fdb3603e26866`) on
@@ -210,7 +209,7 @@ Phase 0 hypothesis for F-002 is **accepted**. Proceed to F-003.
 
 ## Notes and recommendations for R-001 / R-003 (real Rust crate)
 
-1. **Pin `deno_core = "0.399"`.** PLAN §3.2's `"0.318"` is stale; the API
+1. **Pin `deno_core = "0.399"`.** the original implementation plan's `"0.318"` is stale; the API
    has moved. Re-verify on every crate bump (especially `scope!` macro and
    `resolve` / `with_event_loop_promise` shape).
 

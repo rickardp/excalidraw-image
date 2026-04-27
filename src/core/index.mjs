@@ -7,14 +7,13 @@
 //      before Excalidraw's package root is pulled in (which reads
 //      `devicePixelRatio`, `document`, etc. at module-eval time).
 //   2. Registers `globalThis.__render` — the one and only public surface of
-//      the JS core (PLAN.md §4.1). The Rust host (R-003) calls this via a
+//      the JS core. The Rust host calls this via a
 //      classic-script trampoline; the Deno dev entry (J-009) calls it
 //      directly.
 //
 // Design notes:
 // - Excalidraw's `exportToSvg` is imported LAZILY via a dynamic `import()`
-//   inside the render function, NOT at top level. Rationale (PHASE0.md
-//   Finding A + J-008 task notes):
+//   inside the render function, NOT at top level. Rationale:
 //     * Under Node (where vitest runs), a top-level
 //       `import "@excalidraw/excalidraw"` fails because the package pulls
 //       React, JSX runtimes, Radix, Jotai, etc. — all of which esbuild's
@@ -28,9 +27,8 @@
 //       replaced the import specifier; the dynamic import resolves to the
 //       bundled Excalidraw entry.
 // - The module has NO top-level side effects beyond the shim install and
-//   the `globalThis.__render =` assignment. Nothing is exported (PLAN.md
-//   §4.1 — `render` is internal; `globalThis.__render` is the public
-//   surface).
+//   the `globalThis.__render =` assignment. Nothing is exported; `render` is
+//   internal and `globalThis.__render` is the public surface.
 // - Host-neutral: no `process`, `Bun`, `Deno`, `fs`, `path`, `node:*`.
 
 import "./shims/install.mjs";
@@ -38,7 +36,7 @@ import { getSharedTextMetricsProvider } from "./text-metrics.mjs";
 
 // FNT-009 — allowlist of font family names that may appear as the FIRST
 // family in an emitted `<text font-family="…">` attribute when the caller
-// passes `opts.strictFonts: true`. See PLAN.md §4A.5.
+// passes `opts.strictFonts: true`. See the implementation notes
 //
 // Rationale for each entry:
 //   - Excalifont, Virgil, Nunito, "Lilita One", "Comic Shanns", Cascadia —
@@ -47,7 +45,7 @@ import { getSharedTextMetricsProvider } from "./text-metrics.mjs";
 //     packages/common/src/constants.ts FONT_FAMILY). Emitted as-is when a
 //     scene sets fontFamily=9.
 //   - Helvetica — numeric id 2. We do NOT rewrite the SVG attribute
-//     (PLAN §4A.5 point 3: the SVG string must keep Helvetica so
+//     (the SVG string must keep Helvetica so
 //     .excalidraw.svg payloads round-trip). Metrics are routed to
 //     Liberation Sans via FAMILY_ALIASES inside text-metrics.mjs.
 //   - Assistant — numeric id 10. Bundled as a WOFF2 in FONT_ASSETS.
@@ -159,7 +157,7 @@ async function render(sceneJsonOrString, opts = {}) {
   // ALLOWED_FIRST_FAMILIES and throw. Default (undefined/false) behavior
   // is permissive: unknown numeric fontFamily IDs fall through to the
   // Excalifont metrics path already wired in text-metrics.mjs. See
-  // PLAN §4A.5 for the policy.
+  // the implementation notes for the policy.
   if (opts.strictFonts) {
     const firstFamilies = _collectFirstFamilies(svg);
     const unknown = firstFamilies.filter(

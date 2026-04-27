@@ -1,6 +1,6 @@
 // Unit tests for src/core/shims/canvas.mjs (J-005).
 // Vitest, no jsdom — the DOM shim itself supplies document via linkedom.
-// See PLAN.md §4.2 and upstream SVG_EXPORT.md §3.2.
+// See the implementation notes and upstream SVG_EXPORT.md §3.2.
 
 import { describe, it, expect, beforeAll } from "vitest";
 

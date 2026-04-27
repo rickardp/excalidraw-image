@@ -1,7 +1,7 @@
 // src/core/shims/web-globals.mjs
 //
 // Installs the Web-platform globals that Deno provides but `deno_core` does
-// not. See PHASE0.md §"Finding B" and PLAN.md §4.2. Source of truth polyfills
+// not. See the feasibility spike notes and the implementation notes. Source of truth polyfills
 // from spike-rust/src/polyfills.js (F-002).
 //
 // Strategy per global: if already present (native V8 / host / Deno), leave

@@ -39,7 +39,7 @@ Installed before the `@excalidraw/excalidraw` import, in order:
 
 | Shim                     | Rationale |
 |--------------------------|-----------|
-| `linkedom` window/document + `Node`, `Element`, `HTMLElement`, `SVGElement`, `DocumentFragment`, `navigator`, `location` | `exportToSvg` builds an actual `SVGSVGElement` tree. PLAN §4.2; SVG_EXPORT.md §3.1 has the full inventory. |
+| `linkedom` window/document + `Node`, `Element`, `HTMLElement`, `SVGElement`, `DocumentFragment`, `navigator`, `location` | `exportToSvg` builds an actual `SVGSVGElement` tree. the original implementation plan; SVG_EXPORT.md §3.1 has the full inventory. |
 | `window.btoa` / `window.atob` mapped from `globalThis.btoa/atob` | `@excalidraw/excalidraw/data/encode` calls `window.btoa` explicitly (not the global). Deno has `globalThis.btoa` but not `window.btoa`. |
 | `FontFace` class + `document.fonts` stub | The export path may construct `FontFace` even with `skipInliningFonts: true` via module-eval-time `new FontFace(...)` in Excalidraw's font registry. |
 | `document.createElement("canvas")` → fake 2D context with settable `font` + `measureText(t) → { width: t.length * 8 }` | `scene/export.ts:69` creates a canvas directly (frame-label truncation) — does not go through `setCustomTextMetricsProvider`. The placeholder width is good enough for F-001 (`basic-shapes` has no text). Real fontkit-backed metrics land in T-001/T-003. Non-canvas tags delegate to linkedom. |
@@ -68,13 +68,13 @@ sub-path gymnastics were required.
 | Unminified (readable, debuggable) | 4,325,539  | 4.13  |
 | Minified                         | 3,334,416  | 3.18  |
 
-PLAN §5.6 target: 1–4 MB for the JS core portion of the binary (the Rust shell
+the original implementation plan target: 1–4 MB for the JS core portion of the binary (the Rust shell
 adds V8 + resvg on top). We land at the high end of the target range; still
 under it.
 
 ## Metafile audit
 
-Running the standard forbidden-path check from PLAN §5.7 step 4 (excluding
+Running the standard forbidden-path check from the original implementation plan step 4 (excluding
 virtual `stub-virtual:` entries that the build plugin creates when it
 *replaces* a module, not when the real module leaks through):
 
@@ -130,7 +130,7 @@ Observations:
 ## What the esbuild alias + `.css` empty loader were not sufficient for
 
 Several editor-only dependencies required **stubbing at bundle time** beyond
-the PLAN §5.7 step 2 list (`react`, `react-dom`, `react-dom/client`, `jotai`):
+the the original implementation plan step 2 list (`react`, `react-dom`, `react-dom/client`, `jotai`):
 
 - `@excalidraw/mermaid-to-excalidraw` — pulls in `mermaid`, which pulls in
   `vscode-jsonrpc` and transitively imports Node built-ins (`path`, `os`,
@@ -168,7 +168,7 @@ their input so surviving JSX call sites don't error.
 
 ### Assessment
 
-PLAN §5.7 step 2's alias list (`react`, `react-dom`, `jotai`, `.css: empty`)
+the original implementation plan step 2's alias list (`react`, `react-dom`, `jotai`, `.css: empty`)
 is **necessary but not sufficient**. The real `src/scripts/build-core.mjs`
 needs the expanded stub list and the Proxy-based virtual module. This is a
 direct deliverable for J-010 — the spike's `build.mjs` is a good blueprint.
@@ -198,7 +198,7 @@ Empty `<metadata />` is expected when `exportEmbedScene` is false. Empty
 `<mask />` is expected when the scene has no masked elements. Nothing
 broken.
 
-## Verdict — PLAN §3.1 acceptance criteria
+## Verdict — the original implementation plan acceptance criteria
 
 - [x] **Bundle runs under Deno.** `deno run --allow-read spike/dev.mjs
   tests/fixtures/basic-shapes.excalidraw` exits 0 and writes an SVG.
@@ -222,7 +222,7 @@ Phase 0 hypothesis for F-001 is **accepted**. Proceed to F-002.
    bundle is a single file with no runtime imports surviving.
 2. **Promise returned from `__render`.** `exportToSvg` is async, so
    `__render` returns a `Promise<{ svg }>`. The Rust host must use
-   `rt.resolve_value(promise)` per PLAN §5.2 to await; it cannot simply
+   `rt.resolve_value(promise)` per the original implementation plan to await; it cannot simply
    read the value synchronously.
 3. **Globals the bundle expects before `__render` is called.** All are set
    by `shims.mjs`, which runs before the `exportToSvg` import. The Rust
@@ -242,11 +242,11 @@ Phase 0 hypothesis for F-001 is **accepted**. Proceed to F-002.
    `deno_fetch` — but if a fixture with images comes in before full shim
    work, the Rust host will need to either register a minimal `fetch` op or
    mirror the data:-URL handling in Rust.
-7. **Bundle size.** 3.3 MB minified is well under the PLAN §5.6 JS budget
+7. **Bundle size.** 3.3 MB minified is well under the the original implementation plan JS budget
    (1–4 MB) and adds only ~3–4 MB to the final binary after V8 does its
    thing. On track.
 8. **Call convention.** F-002 should keep the `globalThis.__in.scene /
-   opts` trampoline pattern suggested in PLAN §5.2 — our `__render`
+   opts` trampoline pattern suggested in the original implementation plan — our `__render`
    already accepts a string, so `serde_json::to_string(scene)` and
    stashing it is the clean path.
 
@@ -261,7 +261,7 @@ Phase 0 hypothesis for F-001 is **accepted**. Proceed to F-002.
   error message will point straight at `spike/shims.mjs`.
 - **`platform=neutral` needs explicit `mainFields`.** Default `mainFields:
   []` under `platform=neutral` broke CJS resolution for `inherits`,
-  `crc-32`, etc. PLAN §3.1 calls out `--platform=neutral`; J-010 needs to
+  `crc-32`, etc. the original implementation plan calls out `--platform=neutral`; J-010 needs to
   add `mainFields: ["browser", "module", "main"]` and
   `conditions: ["module", "import", "browser", "default"]` to match.
 - **`stub-virtual:` inputs in metafile.** These are artifacts of esbuild's

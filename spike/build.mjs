@@ -21,7 +21,7 @@ const minify = process.argv.includes("--minify");
 // plugin is more reliable than `alias` for turning a bare specifier into
 // an absolute path under platform=neutral.
 //
-// - react / react-dom / jotai: PLAN §5.7 step 2.
+// - react / react-dom / jotai: the original implementation plan step 2.
 // - @excalidraw/mermaid-to-excalidraw: editor-only (MermaidToExcalidraw dialog).
 //   Pulls in mermaid → vscode-jsonrpc → node:path/os/crypto, none of which
 //   exportToSvg needs. Stubbing here keeps the bundle host-neutral.
@@ -97,7 +97,7 @@ const NAMED_EXPORTS = [
 
 // Excalidraw's index.js does static `import("./locales/xx-XX-HASH.js")` for
 // every supported locale — 54 files totalling ~1.7 MB. The export path does
-// not read i18n strings, so we stub the whole locales directory. PLAN §5.7.
+// not read i18n strings, so we stub the whole locales directory. the original implementation plan
 const localeFilter = /(^|\/)locales\/[a-z0-9_-]+\.js$/i;
 
 const stubPlugin = {

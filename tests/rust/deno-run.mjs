@@ -1,7 +1,7 @@
 // R-007 — parity gate Deno driver.
 //
 // This file is the JS side of the Deno-vs-Rust byte-identity gate
-// (PLAN §8.2). Both runtimes read the same fixture and emit the same
+// (the implementation notes). Both runtimes read the same fixture and emit the same
 // SVG bytes; any divergence is a host leak and blocks the gate.
 //
 // Why this file exists — and why `src/core/dev.mjs` is NOT what we diff:

@@ -6,5 +6,7 @@
 // testability.
 
 pub mod argv;
+pub mod embed;
 pub mod engine;
+pub mod extract;
 pub mod raster;

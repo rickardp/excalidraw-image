@@ -1,6 +1,6 @@
 // tests/js/font-roundtrip.test.mjs — FNT-011
 //
-// PLAN §4A.8 gate 6: ".excalidraw.svg round-trip". Exporting a scene with
+// the implementation notes gate 6: ".excalidraw.svg round-trip". Exporting a scene with
 // `--embed-scene` and decoding the base64 payload back must yield text
 // elements whose `fontFamily` (numeric) exactly equals the input, AND the
 // outer SVG's `font-family` attribute on each corresponding <text> node
@@ -13,7 +13,7 @@
 //
 // E-003 landed before this task did and exports `decodePayload(svg)` from
 // tests/js/embed-scene-roundtrip.test.mjs (see its "completion notes"
-// referenced in TASKS.md FNT-011 + E-003). We import it verbatim so the
+// referenced in the original task notes + E-003). We import it verbatim so the
 // two gates (E-003 shape round-trip, FNT-011 font metadata round-trip)
 // share a single decode implementation.
 

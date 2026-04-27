@@ -1,6 +1,6 @@
 // spike/shims.mjs
 // Minimal shim layer that must be installed BEFORE any @excalidraw/excalidraw
-// code is evaluated. See PLAN.md §4.2 and SVG_EXPORT.md §5 for the design.
+// code is evaluated. See the upstream SVG_EXPORT.md notes for the DOM surface.
 //
 // Goal: get exportToSvg running under a plain ESM runtime (Deno + deno_core)
 // with no React, no browser, no network. Everything is deliberately minimal

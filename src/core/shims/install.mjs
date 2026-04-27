@@ -7,7 +7,7 @@
 // can write a single `import "./shims/install.mjs"` at the top of the entry
 // and trust that the runtime environment is ready for the Excalidraw bundle.
 //
-// Order (see PLAN.md §4.2, updated post-F-002, and PHASE0.md Findings B+C):
+// Order (see the implementation notes, updated post-F-002, and the feasibility spike notes Findings B+C):
 //
 //   dom → web-globals → fonts → fetch-fonts → canvas → workers
 //

@@ -1,32 +1,42 @@
-// R-004 / PNG-002 — `excalidraw-image` CLI entry point.
+// `excalidraw-image` CLI entry point.
 //
-// Wires:
-//   * argv parsing (R-002) — `argv::parse` takes an iterator excluding argv[0],
-//     handles `--help` / `--version` internally (printing + `exit(0)`), and
-//     returns `anyhow::Error` on argv problems (unknown flag, bad number,
-//     duplicate positional).
-//   * file / stdin I/O — `-` means stdin for input and stdout for output.
-//   * engine invocation (R-003) — one-shot `Engine::new()` + `render()`. No
-//     warm reuse yet; cold-start is already <100 ms per F-002.
-//   * PNG rasterization (PNG-001) — when `--format png` (or `.png` extension),
-//     hand the SVG string to `raster::svg_to_png` which returns PNG bytes.
+// Pipeline:
+//   1. Parse argv. `--help` / `--version` exit inside `parse`.
+//   2. Read input bytes (file or stdin).
+//   3. Sniff the bytes — input format is decided by content, never by the
+//      input path's extension.
+//   4. Resolve the output format. Precedence:
+//        a. `--format` (explicit) wins.
+//        b. Else output path extension.
+//        c. Else default by input: Excalidraw → Svg, Svg/Png → Excalidraw.
+//   5. Resolve `embed_scene` (editable vs. plain) for the output. Defaults
+//      key off the output extension (`.excalidraw.svg` / `.excalidraw.png`
+//      → editable; plain `.svg` / `.png` → not).
+//   6. Dispatch:
+//        - Forward (Excalidraw → Svg/Png): JS render → optional rasterize →
+//          optional PNG tEXt embed. SVG embedding happens inside the JS
+//          render via `exportEmbedScene`.
+//        - Reverse (Svg/Png → Excalidraw): pure-Rust extract.
+//        - Round-trip (Svg/Png → Svg/Png): extract, then forward path.
+//        - Pass-through (Excalidraw → Excalidraw): copy bytes.
+//      Reverse / round-trip require the input to embed an Excalidraw
+//      payload; missing payload is a clear runtime error (this CLI is not
+//      a general-purpose SVG/PNG reader).
 //
-// Exit-code policy (R-008 acceptance, PLAN §5.8):
+// Exit-code policy:
 //   0 — success.
-//   1 — runtime errors: missing input file, invalid JSON scene, JS-side
-//       throw, or rasterization failure.
-//   2 — argv errors: unknown flag, bad number, duplicate positional.
-//
-// The top-level `main` is a thin wrapper: it converts `run()`'s error into a
-// stderr line and the right exit code. Anything more clever (stack traces,
-// structured logging) is not earned at v1 scope.
+//   1 — runtime errors: missing input, invalid JSON scene, JS-side throw,
+//       missing embedded payload, rasterization failure, write failure.
+//   2 — argv errors: unknown flag, bad number, conflicting flags.
 
 use std::io::{Read, Write};
 
 use anyhow::Context;
 
 use excalidraw_image::argv::{self, ArgvError, Format};
+use excalidraw_image::embed;
 use excalidraw_image::engine;
+use excalidraw_image::extract::{self, InputKind};
 use excalidraw_image::raster;
 
 #[tokio::main(flavor = "current_thread")]
@@ -34,8 +44,6 @@ async fn main() {
     match run().await {
         Ok(()) => {}
         Err(RunError::Argv(e)) => {
-            // argv errors go through lexopt / our own bail!s. Per R-008 the
-            // user-facing message ends with a hint to `--help`.
             eprintln!("error: {e:#}");
             eprintln!("run `excalidraw-image --help` for usage.");
             std::process::exit(2);
@@ -47,8 +55,6 @@ async fn main() {
     }
 }
 
-/// `main()`'s error type encodes the exit-code split between argv (2) and
-/// runtime (1) without leaking a dedicated enum out of the library.
 enum RunError {
     Argv(anyhow::Error),
     Runtime(anyhow::Error),
@@ -60,50 +66,149 @@ async fn run() -> Result<(), RunError> {
         ArgvError::Parse(err) => RunError::Argv(err),
     })?;
 
-    // Step 2 — read input. Per PLAN §5.3, `-` means stdin.
-    let scene = read_input(&args.input).map_err(RunError::Runtime)?;
+    // Step 2 — read input bytes. `-` means stdin.
+    let input_bytes = read_input(&args.input).map_err(RunError::Runtime)?;
 
-    // Step 3 — render JS side → SVG string.
-    let mut engine = engine::Engine::new();
-    let result = engine
-        .render(&scene, &args.opts_json())
-        .await
-        .context("render failed")
-        .map_err(RunError::Runtime)?;
+    // Step 3 — sniff input bytes.
+    let input_kind = extract::sniff(&input_bytes).map_err(RunError::Runtime)?;
 
-    // Step 4 — pick output bytes. SVG goes out raw (no trailing newline so
-    // `deno run … dev.mjs` and the Rust binary stay byte-identical when
-    // dev.mjs does `Deno.stdout.write`). PNG goes through resvg with the
-    // embedded fontdb (PNG-001).
-    let bytes: Vec<u8> = match args.format {
-        Format::Svg => result.svg.into_bytes(),
-        Format::Png => {
-            let raster_opts = raster::RasterOptions {
-                scale: args.scale.map(|s| s as f32),
-                max: args.max.map(|m| m as u32),
-            };
-            raster::svg_to_png(&result.svg, &raster_opts)
-                .context("PNG rasterization failed")
+    // Step 4 — resolve output format from input + flags.
+    let output_format = resolve_output_format(args.format, input_kind);
+
+    // Step 5 — resolve embed_scene for the output.
+    let embed_scene = args.resolve_embed_scene(output_format, &args.output);
+
+    // Step 6 — dispatch.
+    let bytes = match (input_kind, output_format) {
+        (InputKind::Excalidraw, Format::Excalidraw) => input_bytes,
+
+        (InputKind::Excalidraw, Format::Svg) => {
+            let scene = utf8_input(input_bytes, "input .excalidraw")
+                .map_err(RunError::Runtime)?;
+            render_svg(&scene, &args, embed_scene)
+                .await
+                .map_err(RunError::Runtime)?
+                .into_bytes()
+        }
+
+        (InputKind::Excalidraw, Format::Png) => {
+            let scene = utf8_input(input_bytes, "input .excalidraw")
+                .map_err(RunError::Runtime)?;
+            render_png(&scene, &args, embed_scene)
+                .await
+                .map_err(RunError::Runtime)?
+        }
+
+        (InputKind::Svg, Format::Excalidraw) => {
+            let svg = utf8_input(input_bytes, "SVG input").map_err(RunError::Runtime)?;
+            extract::extract_from_svg(&svg)
+                .map_err(RunError::Runtime)?
+                .into_bytes()
+        }
+
+        (InputKind::Png, Format::Excalidraw) => extract::extract_from_png(&input_bytes)
+            .map_err(RunError::Runtime)?
+            .into_bytes(),
+
+        (InputKind::Svg, Format::Svg) => {
+            let svg = utf8_input(input_bytes, "SVG input").map_err(RunError::Runtime)?;
+            let scene = extract::extract_from_svg(&svg).map_err(RunError::Runtime)?;
+            render_svg(&scene, &args, embed_scene)
+                .await
+                .map_err(RunError::Runtime)?
+                .into_bytes()
+        }
+        (InputKind::Png, Format::Svg) => {
+            let scene = extract::extract_from_png(&input_bytes).map_err(RunError::Runtime)?;
+            render_svg(&scene, &args, embed_scene)
+                .await
+                .map_err(RunError::Runtime)?
+                .into_bytes()
+        }
+
+        (InputKind::Svg, Format::Png) => {
+            let svg = utf8_input(input_bytes, "SVG input").map_err(RunError::Runtime)?;
+            let scene = extract::extract_from_svg(&svg).map_err(RunError::Runtime)?;
+            render_png(&scene, &args, embed_scene)
+                .await
+                .map_err(RunError::Runtime)?
+        }
+        (InputKind::Png, Format::Png) => {
+            let scene = extract::extract_from_png(&input_bytes).map_err(RunError::Runtime)?;
+            render_png(&scene, &args, embed_scene)
+                .await
                 .map_err(RunError::Runtime)?
         }
     };
 
-    // Step 5 — write output.
     write_output(&args.output, &bytes).map_err(RunError::Runtime)?;
-
     Ok(())
 }
 
-fn read_input(path: &str) -> anyhow::Result<String> {
+fn resolve_output_format(requested: Option<Format>, input: InputKind) -> Format {
+    if let Some(f) = requested {
+        return f;
+    }
+    match input {
+        InputKind::Excalidraw => Format::Svg,
+        InputKind::Svg | InputKind::Png => Format::Excalidraw,
+    }
+}
+
+/// Run the JS render pipeline once, returning the SVG string. Embeds the
+/// scene via Excalidraw's own `exportEmbedScene` flag when `embed_scene`.
+async fn render_svg(
+    scene_json: &str,
+    args: &argv::Args,
+    embed_scene: bool,
+) -> anyhow::Result<String> {
+    let mut engine = engine::Engine::new();
+    let result = engine
+        .render(scene_json, &args.opts_json(embed_scene))
+        .await
+        .context("render failed")?;
+    Ok(result.svg)
+}
+
+/// Forward path to PNG: render SVG (without scene embed — PNG carries the
+/// scene in a tEXt chunk instead) and rasterize. Then, when `embed_scene`,
+/// inject the scene via `embed::embed_scene_in_png`.
+async fn render_png(
+    scene_json: &str,
+    args: &argv::Args,
+    embed_scene: bool,
+) -> anyhow::Result<Vec<u8>> {
+    // The JS-side `exportEmbedScene` only affects SVG output. For PNG, the
+    // tEXt chunk is added by us after rasterization, so we render without it.
+    let svg = render_svg(scene_json, args, false).await?;
+
+    let raster_opts = raster::RasterOptions {
+        scale: args.scale.map(|s| s as f32),
+        max: args.max.map(|m| m as u32),
+    };
+    let png = raster::svg_to_png(&svg, &raster_opts).context("PNG rasterization failed")?;
+
+    if embed_scene {
+        embed::embed_scene_in_png(&png, scene_json).context("PNG scene embed failed")
+    } else {
+        Ok(png)
+    }
+}
+
+fn utf8_input(bytes: Vec<u8>, label: &str) -> anyhow::Result<String> {
+    String::from_utf8(bytes).with_context(|| format!("{label} is not valid UTF-8"))
+}
+
+fn read_input(path: &str) -> anyhow::Result<Vec<u8>> {
     match path {
         "-" => {
-            let mut s = String::new();
+            let mut v = Vec::new();
             std::io::stdin()
-                .read_to_string(&mut s)
-                .context("failed to read scene from stdin")?;
-            Ok(s)
+                .read_to_end(&mut v)
+                .context("failed to read input from stdin")?;
+            Ok(v)
         }
-        p => std::fs::read_to_string(p).with_context(|| format!("failed to read {p}")),
+        p => std::fs::read(p).with_context(|| format!("failed to read {p}")),
     }
 }
 
@@ -111,7 +216,7 @@ fn write_output(path: &str, bytes: &[u8]) -> anyhow::Result<()> {
     match path {
         "-" => std::io::stdout()
             .write_all(bytes)
-            .context("failed to write SVG to stdout"),
+            .context("failed to write output to stdout"),
         p => std::fs::write(p, bytes).with_context(|| format!("failed to write {p}")),
     }
 }

@@ -64,6 +64,17 @@ lexopt = "0.3"
 resvg = "0.45"
 usvg = "0.45"
 tiny-skia = "0.11"
+# Reverse + symmetric round-trip (.excalidraw.svg / .png → .excalidraw, and
+# embedding the scene back into PNG output for editable round-trips):
+#   base64    – SVG payload comment encoding.
+#   flate2    – zlib deflate/inflate for the bstring payload.
+#   crc32fast – PNG tEXt chunk CRC for the embed-into-PNG path.
+# All three are already in the transitive tree via resvg/usvg; pinning them
+# as direct deps means the `extract` and `embed` modules don't depend on a
+# transitive that could be feature-gated away later.
+base64 = "0.22"
+flate2 = "1"
+crc32fast = "1"
 # Font byte sources, split for crates.io's per-crate size cap and for opt-in
 # CJK. Always-on Latin core; CJK feature-gated.
 excalidraw-image-fonts-core = { version = "1.0.0", path = "../excalidraw-image-fonts-core" }

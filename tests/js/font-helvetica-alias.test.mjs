@@ -3,7 +3,7 @@
 // Helvetica (scene fontFamily id=2) must:
 //   (a) emit `font-family="Helvetica, …"` on the `<text>` element so that
 //       .excalidraw.svg payloads round-trip the user's chosen family
-//       (PLAN §4A.5 point 3: we NEVER rewrite the attribute); and
+//       (the implementation notes point 3: we NEVER rewrite the attribute); and
 //   (b) be MEASURED with Liberation Sans metrics via the T-001 alias map
 //       in src/core/text-metrics.mjs (FAMILY_ALIASES = { Helvetica:
 //       "Liberation" }).
@@ -104,7 +104,7 @@ describe("FNT-008 Helvetica → Liberation aliasing", () => {
     expect(matches.length).toBeGreaterThan(0);
     for (const [, fam] of matches) {
       expect(fam).toContain("Helvetica");
-      // PLAN §4A.5: we MUST NOT rewrite the attribute to Liberation.
+      // the implementation notes: we MUST NOT rewrite the attribute to Liberation.
       expect(fam).not.toMatch(/^Liberation/);
       const first = fam.split(",")[0].trim().replace(/^['"]|['"]$/g, "");
       expect(first).toBe("Helvetica");

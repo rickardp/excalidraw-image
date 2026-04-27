@@ -5,7 +5,7 @@
 // Production goes through the Rust shell (R-004); this exists solely to power
 // the fast dev loop and the Deno-vs-Rust parity gate (R-007).
 //
-// Contract (PLAN.md §4.1.1):
+// Contract (the implementation notes):
 //   deno run --allow-read src/core/dev.mjs <input.excalidraw>
 // Prints the rendered SVG to stdout. Exit 0 on success, 1 on any error.
 

@@ -1,6 +1,6 @@
 // Unit tests for src/core/shims/dom.mjs (J-001).
 // Vitest; does NOT run in a jsdom environment — the shim itself must supply
-// the DOM surface. See PLAN.md §4.2 and PHASE0.md Finding C.
+// the DOM surface. See the implementation notes and the feasibility spike notes Finding C.
 
 import { describe, it, expect, beforeAll } from "vitest";
 

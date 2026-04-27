@@ -1,6 +1,6 @@
 // R-008 — error-handling gate.
 //
-// Verifies the exit-code policy from PLAN §5.8 / TASKS R-008:
+// Verifies the exit-code policy from the implementation notes / the original task board R-008:
 //   * missing input file → exit 1, stderr names the path.
 //   * unknown flag        → exit 2, stderr mentions `--help`.
 //   * invalid scene JSON  → exit 1, stderr starts with `error:`.

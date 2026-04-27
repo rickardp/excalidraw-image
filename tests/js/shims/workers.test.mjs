@@ -2,7 +2,7 @@
 //
 // The shim's single job is to ensure `typeof globalThis.Worker === "undefined"`
 // before Excalidraw's subset-main.ts evaluates, so that `shouldUseWorkers`
-// is captured as `false`. See PLAN.md §4.2 and upstream SVG_EXPORT.md §3.4.
+// is captured as `false`. See the implementation notes and upstream SVG_EXPORT.md §3.4.
 //
 // Node (the vitest host) does NOT expose `Worker` on globalThis by default
 // (Node 22+ has `Worker` via `node:worker_threads`, but it is not a global).

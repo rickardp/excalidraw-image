@@ -1,6 +1,6 @@
 // R-002 — argv parser for `excalidraw-image`.
 //
-// PLAN §5.4 documents the CLI surface. This module:
+// the implementation notes documents the CLI surface. This module:
 //   * parses command-line arguments with `lexopt` (minimal, no derive);
 //   * normalizes `-` for stdin/stdout;
 //   * serializes to the JSON shape that `src/core/index.mjs` `render()`
@@ -39,11 +39,13 @@ impl std::fmt::Display for ArgvError {
 
 impl std::error::Error for ArgvError {}
 
-/// Output image format. Chosen explicitly via `--format` or inferred from
-/// the output path's extension. `Png` is wired in Phase 7 (resvg);
-/// Phase 6's main.rs rejects Png with a clear error until PNG-001 lands.
+/// Output format. Chosen explicitly via `--format` or inferred from the
+/// output path's extension. `Excalidraw` is the JSON scene format; it is
+/// the natural target when reversing an `.excalidraw.svg` or scene-bearing
+/// PNG back into editable JSON (the extract path).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
+    Excalidraw,
     Svg,
     Png,
 }
@@ -53,8 +55,10 @@ impl Format {
         let lower = path.to_ascii_lowercase();
         if lower.ends_with(".png") {
             Some(Format::Png)
-        } else if lower.ends_with(".svg") || lower.ends_with(".excalidraw.svg") {
+        } else if lower.ends_with(".excalidraw.svg") || lower.ends_with(".svg") {
             Some(Format::Svg)
+        } else if lower.ends_with(".excalidraw") {
+            Some(Format::Excalidraw)
         } else {
             None
         }
@@ -64,23 +68,32 @@ impl Format {
         match s.to_ascii_lowercase().as_str() {
             "svg" => Ok(Format::Svg),
             "png" => Ok(Format::Png),
-            other => bail!("invalid --format '{other}'; expected 'svg' or 'png'"),
+            "excalidraw" | "json" => Ok(Format::Excalidraw),
+            other => bail!("invalid --format '{other}'; expected 'svg', 'png', or 'excalidraw'"),
         }
     }
 }
 
-/// Parsed command-line arguments. Field names match PLAN §5.4 flags.
+/// Parsed command-line arguments. Field names match the implementation notes flags.
 ///
 /// `background` defaults to `true`; `--no-background` sets it `false`.
 /// `Option<f64>` fields default to "not provided" — `opts_json()` simply
 /// omits them so the JS side picks its own defaults (e.g., `padding=10`,
 /// `scale=1`).
+///
+/// `format` is `None` until `main.rs` sniffs the input bytes — the default
+/// output format depends on whether the input is `.excalidraw` JSON
+/// (defaults to SVG) or an `.excalidraw.svg`/PNG-with-scene (defaults to
+/// `.excalidraw` JSON, i.e. extract).
 #[derive(Debug, Clone, PartialEq)]
 pub struct Args {
     pub input: String,       // "-" for stdin
     pub output: String,      // "-" for stdout
-    pub format: Format,
-    pub embed_scene: bool,
+    pub format: Option<Format>,
+    /// `Some(true)` ⇐ `--editable`; `Some(false)` ⇐ `--non-editable`;
+    /// `None` ⇐ default rules (see `resolve_embed_scene`). The two flags
+    /// are mutually exclusive and conflict-checked at parse time.
+    pub embed_scene_override: Option<bool>,
     pub background: bool,
     pub dark: bool,
     pub padding: Option<f64>,
@@ -96,8 +109,8 @@ impl Default for Args {
         Args {
             input: "-".to_string(),
             output: "-".to_string(),
-            format: Format::Svg,
-            embed_scene: false,
+            format: None,
+            embed_scene_override: None,
             background: true,
             dark: false,
             padding: None,
@@ -122,52 +135,103 @@ const VERSION_BANNER: &str = concat!(
 );
 
 const HELP_TEXT: &str = "\
-excalidraw-image — convert .excalidraw scenes to SVG and PNG.
+excalidraw-image — convert between .excalidraw, SVG, and PNG.
 
 USAGE:
   excalidraw-image <input> [options]
 
+DIRECTIONS:
+  Forward (render):     .excalidraw       →  .svg / .excalidraw.svg / .png
+  Reverse (extract):    .excalidraw.svg   →  .excalidraw
+                        .png              →  .excalidraw
+  Round-trip (re-render): .svg/.png       →  .svg / .excalidraw.svg / .png
+                          (extracts the embedded scene, then re-renders.)
+
+  Reverse and round-trip require the input to carry an embedded scene
+  (Excalidraw's \"Embed scene\" option, or this CLI's default `.excalidraw.svg`
+  / `.excalidraw.png` output, or any output produced with --editable). This
+  tool is NOT a general-purpose SVG/PNG reader; an SVG/PNG without the
+  Excalidraw payload is rejected with a clear error.
+
 INPUTS:
-  <input>                     Path to .excalidraw. Use '-' for stdin.
+  <input>                     Path to input file, or '-' for stdin.
+                              The format is detected from the bytes
+                              (PNG signature, '<' for SVG/XML, '{' for JSON);
+                              the input file extension is NOT consulted.
 
 OUTPUTS:
   -o, --output <file>         Output path. Use '-' for stdout. Default: '-'.
-      --format <svg|png>      Output format. Default: infer from --output
-                              extension, else svg.
-      --embed-scene           Emit editable .excalidraw.svg with scene metadata.
+      --format <fmt>          Force output format. fmt is one of:
+                                excalidraw   .excalidraw JSON (extract)
+                                svg          rendered SVG
+                                png          rendered PNG
+                              Default: infer from --output extension; if
+                              stdout, defaults to svg (excalidraw input)
+                              or excalidraw (svg/png input).
+      --editable              Force the rendered SVG/PNG to embed the
+                              .excalidraw scene so it round-trips on
+                              excalidraw.com. Default for outputs whose
+                              path is `.excalidraw.svg` / `.excalidraw.png`,
+                              and for stdout.
+      --non-editable          Force a plain image with no embedded scene.
+                              Default for outputs whose path is plain
+                              `.svg` / `.png` (without the `.excalidraw.`
+                              prefix). Mutually exclusive with --editable.
 
-RENDERING:
-      --no-background         Omit background rect.
-      --dark                  Dark-mode filter.
-      --padding <n>           Padding in pixels. Default 10.
-      --scale <n>             Scale factor. Default 1.
-      --frame <name|id>       Export only the named frame.
-      --max <n>               Clamp to max width or height.
+RENDERING (ignored when output format is 'excalidraw'):
+      --no-background         Omit the background rectangle.
+      --dark                  Apply Excalidraw's dark-mode filter.
+      --padding <n>           Padding around content, in pixels. Default 10.
+      --scale <n>             Scale factor for raster output. Default 1.
+      --frame <name|id>       Export only the named or id-matched frame.
+      --max <n>               Clamp width and height to <n> pixels.
 
-FONTS:
-      --skip-font-inline      Don't embed @font-face. Viewer must have fonts.
-      --strict-fonts          Error on unknown families instead of falling
-                              back to Excalifont.
+FONTS (ignored when output format is 'excalidraw'):
+      --skip-font-inline      Don't embed @font-face in SVG. Viewer must
+                              already have the fonts installed locally.
+      --strict-fonts          Error on unknown font families instead of
+                              falling back to Excalifont.
 
   -h, --help                  Show this help.
   -v, --version               Show version.
 
+EXIT CODES:
+  0   success
+  1   runtime error (missing/invalid input, no embedded scene, render
+      failure, write failure)
+  2   argv error (unknown flag, bad number, conflicting flags)
+
 EXAMPLES:
-  # Convert to SVG (stdout):
+  # Forward — render to SVG (stdout):
   excalidraw-image scene.excalidraw
 
-  # Convert to file (format inferred from extension):
+  # Forward — write to a file (format inferred from extension):
   excalidraw-image scene.excalidraw -o scene.svg
   excalidraw-image scene.excalidraw -o scene.png
 
-  # Editable .excalidraw.svg (round-trips on excalidraw.com):
-  excalidraw-image scene.excalidraw --embed-scene -o scene.excalidraw.svg
+  # Forward — round-trippable .excalidraw.svg (re-opens on excalidraw.com).
+  # The .excalidraw.svg / .excalidraw.png extensions imply --editable.
+  excalidraw-image scene.excalidraw -o scene.excalidraw.svg
+  excalidraw-image scene.excalidraw -o scene.excalidraw.png
 
-  # PNG at 2x resolution, capped at 1920px:
+  # Forward — plain SVG/PNG with NO embedded scene (smaller, not editable).
+  # Plain .svg / .png extensions imply --non-editable.
+  excalidraw-image scene.excalidraw -o scene.svg
   excalidraw-image scene.excalidraw --scale 2 --max 1920 -o scene.png
 
-  # From stdin to stdout:
-  cat scene.excalidraw | excalidraw-image - --format svg > scene.svg
+  # Reverse — pull the .excalidraw out of an .excalidraw.svg:
+  excalidraw-image scene.excalidraw.svg -o scene.excalidraw
+
+  # Reverse — pull the scene out of a PNG that has it embedded:
+  excalidraw-image scene.png -o scene.excalidraw
+
+  # Round-trip — re-render an .excalidraw.svg as PNG without touching JSON:
+  excalidraw-image scene.excalidraw.svg -o scene.png
+
+  # Stdin → stdout (format detected from input bytes):
+  cat scene.excalidraw     | excalidraw-image - --format svg        > scene.svg
+  cat scene.excalidraw.svg | excalidraw-image - --format excalidraw > scene.excalidraw
+  cat scene.png            | excalidraw-image - --format excalidraw > scene.excalidraw
 ";
 
 /// Parse `args` into an `Args`. The iterator should NOT include the
@@ -177,7 +241,7 @@ EXAMPLES:
 ///
 /// On argv error (unknown flag, missing value, invalid number), returns
 /// `ArgvError::Parse`. Callers should map that to exit code 2 per
-/// PLAN §5 (R-008 formalizes this).
+/// the implementation notes (R-008 formalizes this).
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> std::result::Result<Args, ArgvError> {
     parse_inner(args).map_err(ArgvError::Parse)
 }
@@ -204,7 +268,18 @@ fn parse_inner(args: impl IntoIterator<Item = OsString>) -> Result<Args> {
                     .map_err(|_| anyhow!("--format value is not valid UTF-8"))?;
                 explicit_format = Some(Format::parse(&v)?);
             }
-            Long("embed-scene") => out.embed_scene = true,
+            Long("editable") => {
+                if out.embed_scene_override == Some(false) {
+                    bail!("--editable conflicts with --non-editable");
+                }
+                out.embed_scene_override = Some(true);
+            }
+            Long("non-editable") => {
+                if out.embed_scene_override == Some(true) {
+                    bail!("--non-editable conflicts with --editable");
+                }
+                out.embed_scene_override = Some(false);
+            }
             Long("no-background") => out.background = false,
             Long("dark") => out.dark = true,
             Long("padding") => {
@@ -251,17 +326,18 @@ fn parse_inner(args: impl IntoIterator<Item = OsString>) -> Result<Args> {
 
     out.input = input.unwrap_or_else(|| "-".to_string());
 
-    // Format resolution order (PLAN §5.4):
-    //   1. explicit `--format`
-    //   2. infer from output extension
-    //   3. default: svg
-    out.format = if let Some(f) = explicit_format {
-        f
-    } else if out.output != "-" {
-        Format::from_ext(&out.output).unwrap_or(Format::Svg)
-    } else {
-        Format::Svg
-    };
+    // Output-format resolution at parse time:
+    //   1. explicit `--format` wins
+    //   2. else infer from output extension (only when --output is a real path)
+    //   3. else leave as None — main.rs picks a default after sniffing the
+    //      input bytes (`.excalidraw` → svg; `.excalidraw.svg`/PNG → extract).
+    out.format = explicit_format.or_else(|| {
+        if out.output == "-" {
+            None
+        } else {
+            Format::from_ext(&out.output)
+        }
+    });
 
     Ok(out)
 }
@@ -285,7 +361,7 @@ impl Args {
     ///   * `dark`           (bool)
     ///   * `padding`        (number, optional)
     ///   * `scale`          (number, optional)
-    ///   * `exportingFrame` (string, optional)    — PLAN §5.4 maps `--frame`
+    ///   * `exportingFrame` (string, optional)    — the implementation notes maps `--frame`
     ///   * `max`            (number, optional)
     ///   * `skipFontInline` (bool, optional)
     ///   * `strictFonts`    (bool, optional)
@@ -294,10 +370,51 @@ impl Args {
     /// (Excalidraw's own default), `scale=1`. We only emit a key when its
     /// value is meaningful, so future JS-side default changes don't need a
     /// Rust bump.
-    pub fn opts_json(&self) -> String {
+    /// Resolve the effective "embed the scene metadata in the rendered
+    /// image?" decision for a given output format and path.
+    ///
+    /// Rules (highest priority first):
+    ///   1. `--editable` ⇒ true.
+    ///   2. `--non-editable` ⇒ false.
+    ///   3. Output extension ends `.excalidraw.svg` / `.excalidraw.png` ⇒ true.
+    ///   4. Output extension ends plain `.svg` / `.png` ⇒ false.
+    ///   5. Otherwise (stdout, unknown extension) ⇒ true (editable default).
+    ///
+    /// For `Format::Excalidraw` the value is irrelevant — there is no
+    /// rendered image to embed into; we return `false` so callers don't
+    /// accidentally inject SVG metadata into raw scene JSON.
+    pub fn resolve_embed_scene(&self, fmt: Format, output_path: &str) -> bool {
+        if let Some(v) = self.embed_scene_override {
+            return v;
+        }
+        let lower = output_path.to_ascii_lowercase();
+        match fmt {
+            Format::Excalidraw => false,
+            Format::Svg => {
+                if lower.ends_with(".excalidraw.svg") {
+                    true
+                } else if lower.ends_with(".svg") {
+                    false
+                } else {
+                    true
+                }
+            }
+            Format::Png => {
+                if lower.ends_with(".excalidraw.png") {
+                    true
+                } else if lower.ends_with(".png") {
+                    false
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
+    pub fn opts_json(&self, embed_scene: bool) -> String {
         use serde_json::{json, Map, Value};
         let mut m: Map<String, Value> = Map::new();
-        if self.embed_scene {
+        if embed_scene {
             m.insert("embedScene".to_string(), json!(true));
         }
         // `background` is always emitted: the JS side defaults to true, but
@@ -342,10 +459,10 @@ mod tests {
         let a = parse_strs(&[]).unwrap();
         assert_eq!(a.input, "-");
         assert_eq!(a.output, "-");
-        assert_eq!(a.format, Format::Svg);
+        assert_eq!(a.format, None); // resolved by main.rs after sniffing input
         assert!(a.background);
         assert!(!a.dark);
-        assert!(!a.embed_scene);
+        assert_eq!(a.embed_scene_override, None);
     }
 
     #[test]
@@ -353,7 +470,7 @@ mod tests {
         let a = parse_strs(&["-", "-o", "-"]).unwrap();
         assert_eq!(a.input, "-");
         assert_eq!(a.output, "-");
-        assert_eq!(a.format, Format::Svg);
+        assert_eq!(a.format, None);
     }
 
     #[test]
@@ -366,26 +483,41 @@ mod tests {
     #[test]
     fn format_inferred_from_output_ext_png() {
         let a = parse_strs(&["scene.excalidraw", "-o", "out.png"]).unwrap();
-        assert_eq!(a.format, Format::Png);
+        assert_eq!(a.format, Some(Format::Png));
     }
 
     #[test]
     fn format_inferred_from_output_ext_svg() {
         let a = parse_strs(&["scene.excalidraw", "-o", "out.svg"]).unwrap();
-        assert_eq!(a.format, Format::Svg);
+        assert_eq!(a.format, Some(Format::Svg));
     }
 
     #[test]
     fn format_inferred_from_excalidraw_svg_ext() {
         let a = parse_strs(&["scene.excalidraw", "-o", "out.excalidraw.svg"]).unwrap();
-        assert_eq!(a.format, Format::Svg);
+        assert_eq!(a.format, Some(Format::Svg));
+    }
+
+    #[test]
+    fn format_inferred_from_excalidraw_ext() {
+        let a = parse_strs(&["scene.excalidraw.svg", "-o", "out.excalidraw"]).unwrap();
+        assert_eq!(a.format, Some(Format::Excalidraw));
     }
 
     #[test]
     fn explicit_format_overrides_extension() {
         // extension says svg, --format says png
         let a = parse_strs(&["scene.excalidraw", "-o", "out.svg", "--format", "png"]).unwrap();
-        assert_eq!(a.format, Format::Png);
+        assert_eq!(a.format, Some(Format::Png));
+    }
+
+    #[test]
+    fn explicit_format_excalidraw_accepted() {
+        let a = parse_strs(&["scene.excalidraw.svg", "--format", "excalidraw"]).unwrap();
+        assert_eq!(a.format, Some(Format::Excalidraw));
+        // `json` alias works too.
+        let a = parse_strs(&["scene.excalidraw.svg", "--format", "json"]).unwrap();
+        assert_eq!(a.format, Some(Format::Excalidraw));
     }
 
     #[test]
@@ -399,7 +531,7 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(a.output, "out.png");
-        assert_eq!(a.format, Format::Svg);
+        assert_eq!(a.format, Some(Format::Svg));
     }
 
     #[test]
@@ -412,17 +544,64 @@ mod tests {
     fn all_bool_flags() {
         let a = parse_strs(&[
             "scene.excalidraw",
-            "--embed-scene",
+            "--editable",
             "--dark",
             "--skip-font-inline",
             "--strict-fonts",
         ])
         .unwrap();
-        assert!(a.embed_scene);
+        assert_eq!(a.embed_scene_override, Some(true));
         assert!(a.dark);
         assert!(a.skip_font_inline);
         assert!(a.strict_fonts);
         assert!(a.background); // unchanged default
+    }
+
+    #[test]
+    fn editable_and_non_editable_conflict() {
+        let err =
+            parse_strs(&["scene.excalidraw", "--editable", "--non-editable"]).unwrap_err();
+        assert!(err.to_string().contains("conflicts"), "err: {err}");
+    }
+
+    #[test]
+    fn embed_scene_default_inferred_from_output_extension() {
+        // Plain .svg → not editable.
+        let a = parse_strs(&["scene.excalidraw", "-o", "out.svg"]).unwrap();
+        assert_eq!(a.embed_scene_override, None);
+        assert!(!a.resolve_embed_scene(Format::Svg, &a.output));
+
+        // .excalidraw.svg → editable.
+        let a = parse_strs(&["scene.excalidraw", "-o", "out.excalidraw.svg"]).unwrap();
+        assert!(a.resolve_embed_scene(Format::Svg, &a.output));
+
+        // Plain .png → not editable.
+        let a = parse_strs(&["scene.excalidraw", "-o", "out.png"]).unwrap();
+        assert!(!a.resolve_embed_scene(Format::Png, &a.output));
+
+        // .excalidraw.png → editable.
+        let a = parse_strs(&["scene.excalidraw", "-o", "out.excalidraw.png"]).unwrap();
+        assert!(a.resolve_embed_scene(Format::Png, &a.output));
+
+        // Stdout → editable by default.
+        let a = parse_strs(&["scene.excalidraw"]).unwrap();
+        assert!(a.resolve_embed_scene(Format::Svg, &a.output));
+        assert!(a.resolve_embed_scene(Format::Png, &a.output));
+    }
+
+    #[test]
+    fn embed_scene_flags_override_extension() {
+        let a = parse_strs(&["scene.excalidraw", "-o", "out.svg", "--editable"]).unwrap();
+        assert!(a.resolve_embed_scene(Format::Svg, &a.output));
+
+        let a = parse_strs(&[
+            "scene.excalidraw",
+            "-o",
+            "out.excalidraw.svg",
+            "--non-editable",
+        ])
+        .unwrap();
+        assert!(!a.resolve_embed_scene(Format::Svg, &a.output));
     }
 
     #[test]
@@ -484,7 +663,7 @@ mod tests {
     #[test]
     fn opts_json_default_has_background_true() {
         let a = Args::default();
-        let j: serde_json::Value = serde_json::from_str(&a.opts_json()).unwrap();
+        let j: serde_json::Value = serde_json::from_str(&a.opts_json(false)).unwrap();
         assert_eq!(j["background"], serde_json::json!(true));
         // absent keys should not appear
         assert!(j.get("embedScene").is_none());
@@ -501,7 +680,7 @@ mod tests {
     fn opts_json_shape_all_keys() {
         let a = parse_strs(&[
             "scene.excalidraw",
-            "--embed-scene",
+            "--editable",
             "--no-background",
             "--dark",
             "--padding",
@@ -516,7 +695,7 @@ mod tests {
             "--strict-fonts",
         ])
         .unwrap();
-        let j: serde_json::Value = serde_json::from_str(&a.opts_json()).unwrap();
+        let j: serde_json::Value = serde_json::from_str(&a.opts_json(true)).unwrap();
         assert_eq!(j["embedScene"], serde_json::json!(true));
         assert_eq!(j["background"], serde_json::json!(false));
         assert_eq!(j["dark"], serde_json::json!(true));
@@ -532,7 +711,7 @@ mod tests {
     fn opts_json_is_valid_json() {
         // sanity: parsing is round-trip safe
         let a = Args::default();
-        let s = a.opts_json();
+        let s = a.opts_json(false);
         let _: serde_json::Value = serde_json::from_str(&s).unwrap();
     }
 }

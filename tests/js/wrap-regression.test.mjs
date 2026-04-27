@@ -2,7 +2,7 @@
 //
 // Snapshot-based line-wrap regression gate.
 //
-// SCOPE NOTE. The PLAN.md §4A.8 gate-5 ideal is a live Playwright oracle
+// SCOPE NOTE. The implementation notes gate-5 ideal is a live Playwright oracle
 // against excalidraw.com. That infrastructure is deferred to FNT-005,
 // which needs Playwright anyway for font-fidelity comparisons; this file
 // is the best-we-can-do-without-a-browser version: a baseline captured
@@ -46,7 +46,7 @@ describe("T-006 wrap-regression gate", () => {
     // Load bundle (requires `make core` first). The bundle assumes a
     // browser-ish host; `location` is the one global it reads at
     // module-eval time that Node doesn't provide. See src/core/index.mjs
-    // and the J-010 completion note in TASKS.md.
+    // and the J-010 completion note in the original task board.
     globalThis.location ??= {
       href: "http://localhost/",
       origin: "http://localhost",

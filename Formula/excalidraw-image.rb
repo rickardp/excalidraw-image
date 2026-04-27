@@ -16,7 +16,7 @@
 #   https://github.com/rickardp/excalidraw-image/releases/download/v0.1.0/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz     full GH Releases URL for x86_64-unknown-linux-gnu tarball
 #   8dd6a0d848c743302e5f65105346fedbc980c6f7bfcff31360acc0bfaa6bcff4     sha256 of that tarball
 #
-# Linux ARM64 is not yet shipped (see PHASE0.md and release.yml header).
+# Linux ARM64 is not yet shipped; see the release workflow header.
 # Add an `on_arm` block here and a matching matrix entry in release.yml when
 # that lands.
 

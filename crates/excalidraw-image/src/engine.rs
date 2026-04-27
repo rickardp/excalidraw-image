@@ -5,7 +5,7 @@
 // (`dist/core.mjs`, copied into OUT_DIR by `build.rs`) once at `new()`; every
 // subsequent render reuses the same V8 isolate.
 //
-// Design notes (from F-002 spike + PHASE0.md):
+// Design notes (from F-002 spike + the feasibility spike notes):
 //   * Classic-script eval, NOT ES modules. 0.399's `load_main_es_module_from_code`
 //     silently swallows synchronous throws. `execute_script` surfaces them
 //     immediately. J-010's esbuild `define` strips `import.meta.*` so the
@@ -350,7 +350,7 @@ const PRE_CORE_BOOTSTRAP: &str = r#"
 /// esbuild's `define` keys must be exact property paths. Classic-script
 /// eval rejects any `import.meta` token with `SyntaxError: Cannot use
 /// 'import.meta' outside a module`. Spike did the same string rewrite; see
-/// `spike-rust/src/main.rs` and PHASE0.md §"Finding D".
+/// `spike-rust/src/main.rs` and the feasibility spike notes.
 ///
 /// This is a **workaround**, not the long-term fix. A follow-up J-010 task
 /// should move this substitution into the esbuild step via a plugin so the
@@ -482,7 +482,7 @@ mod tests {
     // If this test ever starts failing with a bundle-load error, the
     // diagnosis order is:
     //   1. dist/core.mjs current? (make core)
-    //   2. shim install order correct? (see PHASE0.md Finding B+C)
+    //   2. shim install order correct? (see the feasibility spike notes Finding B+C)
     //   3. deno_core version still 0.399.0?
     const MINIMAL_SCENE: &str = r##"{
         "type": "excalidraw",

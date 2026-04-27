@@ -1,4 +1,4 @@
-// R-007 — Deno-vs-Rust byte-identity parity gate (PLAN §8.2).
+// R-007 — Deno-vs-Rust byte-identity parity gate (the implementation notes).
 //
 // For every fixture in `tests/fixtures/*.excalidraw`:
 //   1. spawn the release-profile `excalidraw-image` binary;
@@ -8,7 +8,7 @@
 // Any divergence here is a host leak: something in the JS bundle reads a
 // runtime-specific value (locale, timezone, `Math.random` without a seeded
 // path, `performance.now` timing). The fix is always on the JS side — per
-// PLAN §12 ("parity gate ... is the migration-safety gate") and TASKS.md
+// the implementation notes ("parity gate ... is the migration-safety gate") and the original task board
 // appendix ("Do not skip the parity gate by special-casing either host. If
 // Deno and Rust disagree, fix the JS, not the test").
 //

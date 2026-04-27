@@ -5,13 +5,13 @@
 // browser canvas.measureText widths for a fixed test string. The baseline
 // is used by tests/js/browser-fidelity.test.mjs to check that our fontkit-
 // based FontkitTextMetricsProvider agrees with Chromium's native
-// canvas.measureText within ±2 px per 100-char string (PLAN §4A.8 gate 3).
+// canvas.measureText within ±2 px per 100-char string (the implementation notes gate 3).
 //
 // The baseline is *committed*. This script is only run manually when we
 // want to refresh it (dep bump, new family, etc.). The test itself does
 // NOT launch Playwright — it reads the JSON and re-measures locally.
 //
-// Practical deviation from PLAN §4A.8's strict "unmodified Excalidraw web
+// Practical deviation from the implementation notes strict "unmodified Excalidraw web
 // app" oracle: excalidraw.com is too fragile for a CI loop. We self-host
 // the same WOFF2 bytes Excalidraw ships (our bundled FONT_ASSETS) and
 // measure with the browser's canvas — identical font bytes, identical

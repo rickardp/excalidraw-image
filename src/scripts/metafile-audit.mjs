@@ -2,7 +2,7 @@
 //
 // CI gate for forbidden imports in dist/core.mjs. Reads dist/meta.json
 // (produced by J-010's esbuild run) and fails if any input path matches
-// one of the forbidden patterns in PLAN.md §5.7 step 4.
+// one of the forbidden patterns in the implementation notes step 4.
 //
 // These patterns are the signature of Excalidraw's React editor UI, i18n,
 // and CSS — code paths that must be stubbed or tree-shaken out of the
@@ -15,8 +15,8 @@
 // redirects to a real on-disk stub), but future refactors may reintroduce
 // them, so the skip is preventive.
 //
-// Scope: this script checks only the listed patterns. PLAN.md and TASKS.md
-// are authoritative; do not add new rules here without updating both.
+// Scope: this script checks only the listed patterns. Keep this list aligned
+// with the build aliases in src/scripts/build-core.mjs.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -27,11 +27,11 @@ const repoRoot = path.resolve(here, "..", "..");
 const META_PATH =
   process.env.METAFILE_AUDIT_PATH ?? path.join(repoRoot, "dist/meta.json");
 
-// Forbidden patterns — PLAN.md §5.7 step 4, TASKS.md J-011 acceptance.
+// Forbidden patterns for editor UI, i18n, and CSS paths.
 // Minimatch-style: `**` matches any sequence of path segments (including
 // zero), `*` matches within a single segment.
 //
-// Do NOT extend this list without updating PLAN.md §5.7 step 4 first.
+// Do NOT extend this list without updating the matching build aliases first.
 const FORBIDDEN_PATTERNS = [
   "**/components/App.tsx",
   "**/components/LayerUI.tsx",

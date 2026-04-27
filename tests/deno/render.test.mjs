@@ -2,7 +2,7 @@
 //
 // Smoke test for the bundled pipeline: imports dist/core.mjs (the artifact
 // that actually ships) and renders the basic-shapes fixture. This is the
-// "parity gate" entry point described in PLAN §8.2 — if this passes under
+// "parity gate" entry point described in the implementation notes — if this passes under
 // Deno, the same bundle is expected to work under deno_core (R-003).
 //
 // Deliberately imports the bundle, not src/core/index.mjs: the bundle is

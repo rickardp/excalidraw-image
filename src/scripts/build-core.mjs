@@ -18,7 +18,7 @@
 // - Editor-only packages (react*, jotai*, mermaid, @radix-ui/*) are aliased
 //   to the callable-Proxy stub at `src/core/stubs/proxy.mjs`. A plain `{}`
 //   stub breaks `Object.assign(ImportedSymbol, {…})` and
-//   `const { useAtom } = createIsolation()` destructuring. See PHASE0.md
+//   `const { useAtom } = createIsolation()` destructuring. See the feasibility spike notes
 //   §"Finding A".
 // - `@radix-ui/*` wildcards go through a plugin (esbuild `alias` does not
 //   support wildcards).
@@ -26,7 +26,7 @@
 //   rewritten via a plugin to the same Proxy stub — saves ~1.7 MB.
 // - `.css` files are swallowed by the `empty` loader.
 // - `import.meta.*` references are replaced with string literals at build
-//   time. PHASE0.md §"Finding D": `deno_core`'s classic-script `execute_script`
+//   time. the feasibility spike notes: `deno_core`'s classic-script `execute_script`
 //   path doesn't expose `import.meta`, so the bundle must not contain any.
 
 import { build } from "esbuild";
@@ -92,7 +92,7 @@ const result = await build({
   minify: true,
   treeShaking: true,
   legalComments: "none",
-  // PLAN.md §5.7 step 3: strip console + debugger from the shipped bundle.
+  // the implementation notes step 3: strip console + debugger from the shipped bundle.
   drop: ["console", "debugger"],
   alias: {
     react: stubPath,
@@ -114,7 +114,7 @@ const result = await build({
     "import.meta.env.PKG_VERSION": JSON.stringify(pkg.version),
     // Bundled code evaluated by deno_core via classic-script execute_script
     // has no `import.meta.url`; stub to a harmless placeholder so lingering
-    // references don't throw a SyntaxError. PHASE0.md §"Finding D".
+    // references don't throw a SyntaxError. the feasibility spike notes.
     "import.meta.url": JSON.stringify("file:///core.mjs"),
   },
   logLevel: "info",

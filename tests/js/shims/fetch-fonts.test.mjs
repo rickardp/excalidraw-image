@@ -4,7 +4,7 @@
 // `atob` already exists natively, so the manual install branch in the test
 // is defensive.
 //
-// Acceptance (TASKS.md J-004):
+// Acceptance (the original task notes):
 //   - URL matching a FONT_ASSETS entry path → Response with ok=true and
 //     .arrayBuffer() returning bytes that begin with the WOFF2 magic "wOF2".
 //   - data: URL resolves via host fetch when available (conditional).

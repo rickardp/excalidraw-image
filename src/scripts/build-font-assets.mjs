@@ -4,7 +4,7 @@
 // family → [{ path }, ...].
 //
 // Bytes are NOT inlined here (that approach inflated core.mjs to 21 MB, which
-// blocked crates.io publish — see PHASE0.md and the font-split work). Bytes
+// blocked crates.io publish — see the feasibility spike notes and the font-split work). Bytes
 // come from the host at runtime via globalThis.__embeddedFonts, populated by:
 //   * Rust shell: from the excalidraw-image-fonts-{core,cjk} sub-crates
 //     (build-time include_bytes!).
