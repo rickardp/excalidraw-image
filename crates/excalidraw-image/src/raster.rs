@@ -31,11 +31,11 @@ pub struct RasterOptions {
 }
 
 /// Iterate the embedded fonts as `(relative_path, &[u8])` tuples. The bytes
-/// are decompressed TTF (the build script runs every shipped WOFF2 through
-/// woofwoof). Unlike a `static &[(&str, &[u8])]` table — which would need
-/// const-stable subslice indexing (not yet stable, see rust-lang/rust#143874)
-/// — this view materializes the slices at first call from the offset/length
-/// index baked at build time.
+/// are decompressed TTF (the build script decompresses brotli-compressed TTF
+/// from the font sub-crates). Unlike a `static &[(&str, &[u8])]` table —
+/// which would need const-stable subslice indexing (not yet stable, see
+/// rust-lang/rust#143874) — this view materializes the slices at first call
+/// from the offset/length index baked at build time.
 pub fn iter_embedded_fonts() -> impl Iterator<Item = (&'static str, &'static [u8])> {
     EMBEDDED_FONT_INDEX
         .iter()

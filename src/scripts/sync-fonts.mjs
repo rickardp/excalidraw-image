@@ -2,7 +2,12 @@
 // Populate crates/excalidraw-image-fonts-{core,cjk,cjk-extra}/fonts/ from
 // node_modules/@excalidraw/excalidraw/dist/prod/fonts/.
 //
-// We deliberately do NOT commit the woff2 binaries to git. The crates'
+// Each WOFF2 font shard is decompressed to TTF (via wawoff2, WASM-based) and
+// then brotli-compressed at quality 11, producing `.ttf.br` files. This
+// eliminates the C++ build-time dependency (woofwoof / Google woff2 lib) that
+// previously blocked Linux ARM64 cross-compilation.
+//
+// We deliberately do NOT commit the font binaries to git. The crates'
 // fonts/ directories are .gitignored; this script materializes them at
 // build/publish time. Keeps the source tree text-only and gives us one
 // source of truth (the upstream npm package, integrity-pinned via
@@ -43,7 +48,9 @@ import {
 import { join, basename, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { brotliCompressSync, constants } from "node:zlib";
 import * as fontkit from "fontkit";
+import wawoff2 from "wawoff2";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
@@ -99,25 +106,31 @@ function wipeDir(p) {
   mkdirSync(p, { recursive: true });
 }
 
-function copyShard(srcPath, fontsDir, family) {
+async function convertShard(srcPath, fontsDir, family) {
   mkdirSync(join(fontsDir, family), { recursive: true });
-  writeFileSync(join(fontsDir, family, basename(srcPath)), readFileSync(srcPath));
+  const woff2Bytes = readFileSync(srcPath);
+  const ttfBytes = await wawoff2.decompress(woff2Bytes);
+  const brBytes = brotliCompressSync(Buffer.from(ttfBytes), {
+    params: { [constants.BROTLI_PARAM_QUALITY]: 11 },
+  });
+  const outName = basename(srcPath).replace(/\.woff2$/i, ".ttf.br");
+  writeFileSync(join(fontsDir, family, outName), brBytes);
 }
 
 // Mirror of src/scripts/check-font-fingerprints.mjs:hashCrate. The two
 // implementations must stay byte-identical — they share the recorded
 // fingerprint format.
-function walkWoff2(dir, root = dir, out = []) {
+function walkFontFiles(dir, root = dir, out = []) {
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
     const st = statSync(full);
-    if (st.isDirectory()) walkWoff2(full, root, out);
-    else if (st.isFile() && name.toLowerCase().endsWith(".woff2")) out.push(full);
+    if (st.isDirectory()) walkFontFiles(full, root, out);
+    else if (st.isFile() && name.toLowerCase().endsWith(".ttf.br")) out.push(full);
   }
   return out;
 }
 function fingerprintFontsDir(fontsDir) {
-  const files = walkWoff2(fontsDir).sort();
+  const files = walkFontFiles(fontsDir).sort();
   const lines = files.map((p) => {
     const rel = relative(fontsDir, p).split("\\").join("/");
     const sha = createHash("sha256").update(readFileSync(p)).digest("hex");
@@ -173,7 +186,7 @@ function rewriteCargo(toml, { newVersion, newSha, newCount }) {
   return out;
 }
 
-function populate() {
+async function populate() {
   if (!statSync(SRC_FONTS, { throwIfNoEntry: false })?.isDirectory()) {
     console.error(`sync-fonts: missing ${SRC_FONTS}. Run \`npm ci\` first.`);
     process.exit(1);
@@ -193,7 +206,7 @@ function populate() {
       .sort();
     if (family !== "Xiaolai") {
       for (const shard of shards) {
-        copyShard(join(familyDir, shard), dirs.core, family);
+        await convertShard(join(familyDir, shard), dirs.core, family);
         counts.core++;
       }
       continue;
@@ -202,10 +215,10 @@ function populate() {
       const src = join(familyDir, shard);
       const bucket = dominantBucket(readFileSync(src));
       if (EXTRA_BUCKETS.has(bucket)) {
-        copyShard(src, dirs.cjkExtra, family);
+        await convertShard(src, dirs.cjkExtra, family);
         counts.cjkExtra++;
       } else {
-        copyShard(src, dirs.cjk, family);
+        await convertShard(src, dirs.cjk, family);
         counts.cjk++;
       }
     }
@@ -251,8 +264,8 @@ function maybeBump() {
   }
 }
 
-function main() {
-  populate();
+async function main() {
+  await populate();
   if (process.argv.includes("--bump")) maybeBump();
 }
 

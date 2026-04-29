@@ -23,6 +23,9 @@ describe("font-assets smoke", () => {
     const bytes = globalThis.__embeddedFonts[first.path];
     expect(bytes.length).toBeGreaterThan(4);
     // WOFF2 magic number per https://www.w3.org/TR/WOFF2/ §3 = 0x774F4632 "wOF2".
+    // Fonts are stored as brotli-compressed TTF in sub-crates; setup scripts
+    // re-encode TTF→WOFF2 via wawoff2 before populating __embeddedFonts
+    // (Excalidraw's subsetter expects WOFF2 input).
     const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
     expect(magic).toBe("wOF2");
   });

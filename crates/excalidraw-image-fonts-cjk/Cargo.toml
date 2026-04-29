@@ -5,7 +5,7 @@ name = "excalidraw-image-fonts-cjk"
 # the woff2 contents will ever change. Patch is auto-bumped by
 # `npm run sync-fonts -- --bump` whenever the recorded fingerprint
 # drifts from the populated `fonts/` dir.
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 license = "MIT"
 description = "Bundled CJK fonts (Xiaolai) for excalidraw-image"
@@ -16,7 +16,7 @@ rust-version = "1.75"
 include = [
     "src/**/*.rs",
     "build.rs",
-    "fonts/**/*.woff2",
+    "fonts/**/*.ttf.br",
     "Cargo.toml",
     "README.md",
     "LICENSE",
@@ -26,7 +26,7 @@ include = [
 # SHA-256 of (sorted relative path + ":" + sha256-hex of contents) lines, joined by "\n".
 # Verified by `npm run check:fonts`. Update this manually when fonts change,
 # alongside a version bump.
-sha256 = "630cb497d7b7de4fea58a890b78a2de5ea0e74221d8b876156de4993698e24ad"
+sha256 = "aa9c9260865b633248d016b3591a3d8617cb184bb65f901702be1d991b8fe66b"
 file_count = 165
 
 [lib]

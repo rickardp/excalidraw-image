@@ -3,7 +3,7 @@
 // For every supported family in FONT_ASSETS, exercise the full Excalidraw
 // subsetting pipeline end-to-end:
 //
-//   WOFF2 bytes
+//   WOFF2 bytes (from __embeddedFonts, re-encoded at setup from brotli-TTF)
 //     → wawoff2.decompress         → TTF bytes
 //     → fonteditor-core Font.create({type:"ttf", subset:[codepoints]})
 //                                  → subset Font
@@ -55,7 +55,7 @@ async function findShardWithCodepoints(family, codepoints) {
   const shards = FONT_ASSETS[family];
   for (let i = 0; i < shards.length; i++) {
     // Bytes come from globalThis.__embeddedFonts (populated by
-    // tests/js/setup-embedded-fonts.mjs from node_modules).
+    // tests/js/setup-embedded-fonts.mjs — re-encoded WOFF2).
     const bytes = globalThis.__embeddedFonts[shards[i].path];
     if (!bytes) continue;
     let ttf;

@@ -82,18 +82,12 @@ excalidraw-image-fonts-cjk = { version = "1.0.0", path = "../excalidraw-image-fo
 excalidraw-image-fonts-cjk-extra = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk-extra", optional = true }
 
 [build-dependencies]
-# build.rs decompresses WOFF2 → TTF for the resvg fontdb. fontdb only consumes
-# raw TTF/OTF; passing WOFF2 silently produces zero faces. We do this at build
-# time once so the binary's cold start doesn't pay the decompress cost.
-#
-# `woofwoof` is the only WOFF2 decoder I tested that decoded all 234 Excalidraw
-# font shards cleanly: `woff2` 0.3 fails to compile against current
-# `safer-bytes`; `woff2-patched` 0.4 and `woff2-no-std` 0.3 panic with "Stream
-# truncated" on Assistant-Bold.woff2. woofwoof binds the Google C++ woff2 lib
-# + pure-Rust `brotli`. The C++ build dep is the trade-off; it works on macOS
-# (native) and Linux x64 native runners but blocks naive Linux ARM cross-
-# compile (deferred — see release.yml).
-woofwoof = "1"
+# build.rs decompresses brotli-compressed TTF for the resvg fontdb. fontdb only
+# consumes raw TTF/OTF; the font sub-crates ship brotli-compressed TTF produced
+# by `npm run sync-fonts`. Pure Rust — no C++ toolchain needed.
+brotli = "7"
+# Parse the pre-generated WOFF2 blob index (JSON from build-woff2-blob.mjs).
+serde_json = "1"
 # Sub-crates are also build-deps so build.rs can read FONTS arrays directly.
 excalidraw-image-fonts-core = { version = "1.0.0", path = "../excalidraw-image-fonts-core" }
 excalidraw-image-fonts-cjk = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk", optional = true }

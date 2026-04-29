@@ -15,8 +15,11 @@ below.
   upstream `exportToSvg` implementation runs inside the CLI.
 - Text metrics, line breaks, and font selection match within measured
   tolerances.
-- Editable `.excalidraw.svg` files round-trip: re-opening on excalidraw.com
-  restores the original scene.
+- Editable `.excalidraw.svg` and `.excalidraw.png` files round-trip:
+  re-opening on excalidraw.com restores the original scene. PNG round-trip
+  is byte-exact (the original JSON is embedded verbatim in a `tEXt` chunk);
+  SVG round-trip is structurally equivalent (Excalidraw's renderer fills in
+  `appState` defaults).
 
 The CLI is not a pixel-exact reproduction of any specific browser engine.
 Where measurable divergences exist, they are listed below with the mechanism
@@ -44,6 +47,10 @@ All of the following are produced by upstream code:
   and font-family metadata are preserved through export and decode. Locked by
   `tests/js/embed-scene-roundtrip.test.mjs` and
   `tests/js/font-roundtrip.test.mjs`.
+- **Editable `.excalidraw.png` round-trips** — the original scene JSON is
+  embedded verbatim in a PNG `tEXt` chunk, so reverse extraction is
+  byte-exact (it does not pass through Excalidraw's renderer). Locked by
+  `crates/excalidraw-image/tests/round_trip.rs::png_round_trip_is_byte_exact`.
 - **Byte-identical Deno/Rust output** — the dev-loop host (Deno) and the
   production host (`deno_core` in Rust) produce the same SVG bytes for every
   fixture in `tests/fixtures/`. Locked by
@@ -91,15 +98,32 @@ offending families instead of substituting silently.
 
 Locked by `tests/js/font-strict-fonts.test.mjs`.
 
-### CJK Shard Selection
+### CJK Shard Selection And Feature-Gated Bundling
 
 Xiaolai, the CJK fallback, ships as many per-codepoint shards because no
-single shard covers every CJK string. The current
-`FontkitTextMetricsProvider` picks the first shard containing the requested
-codepoints; per-glyph fallback across multiple shards in a single text run is
-tracked in `src/core/text-metrics.mjs`. For text that crosses shard
-boundaries, measurements may use a single shard's metrics for the whole run.
-In practice this is bounded by fontkit `layout()` and has not produced visible
+single shard covers every CJK string. The Latin core is always bundled; CJK
+shards are split across two opt-in cargo features so the default Latin-only
+binary stays small:
+
+- **default (no feature)** — Latin-only; CJK glyphs are unavailable and
+  scenes containing them either fall back to Excalifont metrics or fail
+  under `--strict-fonts`.
+- **`cjk`** — modern Chinese, Japanese kanji, Korean Hangul Syllables, and
+  common CJK punctuation (~165 shards via
+  `excalidraw-image-fonts-cjk`).
+- **`cjk-full`** — implies `cjk`, plus CJK Extension A, CJK Compatibility
+  Ideographs, CJK Radicals, and Hangul Jamo (~44 extra shards via
+  `excalidraw-image-fonts-cjk-extra`).
+
+Prebuilt binaries (Homebrew, GitHub Releases) ship `cjk-full`. Cargo users
+opt in explicitly.
+
+When a CJK build is in use, `FontkitTextMetricsProvider` picks the first
+shard containing the requested codepoints; per-glyph fallback across
+multiple shards in a single text run is tracked in
+`src/core/text-metrics.mjs`. For text that crosses shard boundaries,
+measurements may use a single shard's metrics for the whole run. In
+practice this is bounded by fontkit `layout()` and has not produced visible
 mis-wrapping on test fixtures, but it is a known limitation rather than a
 guarantee.
 
@@ -158,8 +182,10 @@ bytes do not matter for today's fixtures.
 | Strict font handling | `tests/js/font-strict-fonts.test.mjs`. |
 | Emoji local-only policy | `tests/js/font-emoji-local-only.test.mjs`. |
 | Editable SVG payload | `tests/js/embed-scene-roundtrip.test.mjs` and `tests/js/font-roundtrip.test.mjs`. |
+| Symmetric round-trip (`.excalidraw` ↔ SVG/PNG) | `crates/excalidraw-image/tests/round_trip.rs`; PNG path asserts byte-exact extraction. |
 | Deno vs Rust parity | `crates/excalidraw-image/tests/parity.rs`. |
 | PNG end-to-end | `crates/excalidraw-image/tests/png.rs`. |
+| CLI argv / error messages | `crates/excalidraw-image/tests/errors.rs`. |
 | SVG fixture snapshots | `tests/js/svg-goldens.test.mjs`; regenerate via `make goldens`. |
 
 ## Known Follow-Ups
@@ -167,13 +193,18 @@ bytes do not matter for today's fixtures.
 These are not blockers for the documented fidelity claims, but consumers
 should be aware of them.
 
-- **Binary size:** release builds with full CJK support are large because V8,
-  PNG support, and bundled fonts dominate. A future size pass could embed WOFF2
-  and decode at runtime, or split CJK into an opt-in distribution package.
-- **C++ build-time dependency from PNG support:** WOFF2 decoding for the
-  embedded `fontdb` uses `woofwoof` because the pure-Rust alternatives tested
-  failed on at least one shipped shard. This is the main reason Linux ARM64
-  prebuilt binaries are deferred.
+- **Binary size:** the default Latin-only build is around 48 MB on macOS
+  arm64; `cjk` adds ~30 MB and `cjk-full` adds another ~5 MB, bringing the
+  prebuilt binary to ~83 MB. V8 dominates the base; bundled fonts dominate
+  the CJK delta. Further size cuts would require runtime WOFF2 decode or a
+  V8 startup snapshot.
+- **Pre-generated WOFF2 blob:** The JS engine requires WOFF2 input (Excalidraw's
+  subsetter calls `woff2Dec` before subsetting). A pre-build step
+  (`node src/scripts/build-woff2-blob.mjs`) uses wawoff2 (WASM) to produce a
+  single WOFF2 blob that all three runtimes (Rust binary, Deno parity driver,
+  vitest) read from, guaranteeing byte-identical font data. The Rust-side font
+  pipeline uses brotli-compressed TTF (`.ttf.br`) for `fontdb`/`resvg`, avoiding
+  any C++ build-time dependency.
 - **PNG browser/SSIM fidelity gate:** PNG output is exercised end-to-end but
   is not yet compared automatically to a headless-browser rasterization.
 - **PNG binary goldens:** SVG goldens are committed; PNG output is covered by

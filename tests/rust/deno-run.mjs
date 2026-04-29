@@ -25,27 +25,23 @@
 // Populate globalThis.__embeddedFonts BEFORE importing dist/core.mjs.
 // fetch-fonts.mjs and text-metrics.mjs (inside the bundle) read from this
 // global at render time. The Rust shell populates the same global from its
-// font sub-crates via include_bytes!.
+// pre-generated WOFF2 blob (assets/embedded_fonts_js.{bin,json}).
 //
-// Resolve the fonts dir relative to this script's location so cargo test
-// (which sets a different cwd) finds it.
+// For parity, the Deno driver reads from the SAME pre-generated blob —
+// produced by `node src/scripts/build-woff2-blob.mjs` using wawoff2.
+// This guarantees byte-identical WOFF2 on both sides.
 {
   const here = new URL(".", import.meta.url).pathname;
-  const fontsRoot = `${here}../../node_modules/@excalidraw/excalidraw/dist/prod/fonts`;
+  const root = `${here}../../`;
+  const blobPath = `${root}crates/excalidraw-image/assets/embedded_fonts_js.bin`;
+  const indexPath = `${root}crates/excalidraw-image/assets/embedded_fonts_js.json`;
+
+  const blob = await Deno.readFile(blobPath);
+  const index = JSON.parse(await Deno.readTextFile(indexPath));
+
   const map = {};
-  async function* walkWoff2(dir) {
-    for await (const entry of Deno.readDir(dir)) {
-      const full = `${dir}/${entry.name}`;
-      if (entry.isDirectory) {
-        yield* walkWoff2(full);
-      } else if (entry.isFile && entry.name.toLowerCase().endsWith(".woff2")) {
-        yield full;
-      }
-    }
-  }
-  for await (const full of walkWoff2(fontsRoot)) {
-    const rel = full.slice(fontsRoot.length + 1);
-    map[rel] = await Deno.readFile(full);
+  for (const { key, offset, length } of index) {
+    map[key] = new Uint8Array(blob.buffer, blob.byteOffset + offset, length).slice();
   }
   globalThis.__embeddedFonts = map;
 }
@@ -60,7 +56,9 @@ if (!path) {
 
 try {
   const scene = await Deno.readTextFile(path);
-  const { svg } = await globalThis.__render(scene);
+  // The Rust binary defaults to embedScene:true when writing to stdout
+  // (no output path ⇒ "editable" default). Match that here for parity.
+  const { svg } = await globalThis.__render(scene, { embedScene: true });
   const bytes = new TextEncoder().encode(svg);
   // Deno.stdout.write may short-write on a pipe (~200 bytes at a time when the
   // sink is a shell pipe, observed on macOS). Loop until we've drained the

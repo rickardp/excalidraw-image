@@ -27,7 +27,7 @@ function walk(dir) {
       const full = join(d, name);
       const st = statSync(full);
       if (st.isDirectory()) recurse(full);
-      else if (st.isFile() && name.toLowerCase().endsWith(".woff2")) out.push(full);
+      else if (st.isFile() && name.toLowerCase().endsWith(".ttf.br")) out.push(full);
     }
   }
   recurse(dir);

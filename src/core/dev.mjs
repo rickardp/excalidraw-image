@@ -16,25 +16,62 @@ if (typeof Deno === "undefined") {
 // Populate globalThis.__embeddedFonts BEFORE importing index.mjs. The
 // fetch-fonts and text-metrics shims (installed by index.mjs's import chain)
 // look up bytes here at render time. The Rust shell populates the same global
-// from include_bytes! in the font sub-crates; both hosts feed the same shim
-// with the same byte-for-byte content (parity gate R-007).
+// from its pre-generated WOFF2 blob (assets/embedded_fonts_js.{bin,json}).
+//
+// Reads from the pre-generated WOFF2 blob when available (fast, byte-identical
+// to Rust & parity gate). Falls back to re-encoding from .ttf.br via wawoff2
+// if the blob hasn't been built yet.
 {
-  const fontsRoot = "node_modules/@excalidraw/excalidraw/dist/prod/fonts";
-  const map = {};
-  async function* walkWoff2(dir) {
-    for await (const entry of Deno.readDir(dir)) {
-      const full = `${dir}/${entry.name}`;
-      if (entry.isDirectory) {
-        yield* walkWoff2(full);
-      } else if (entry.isFile && entry.name.toLowerCase().endsWith(".woff2")) {
-        yield full;
+  const root = new URL("../../", import.meta.url).pathname;
+  const blobPath = `${root}crates/excalidraw-image/assets/embedded_fonts_js.bin`;
+  const indexPath = `${root}crates/excalidraw-image/assets/embedded_fonts_js.json`;
+
+  let map = {};
+  let usedBlob = false;
+  try {
+    const blob = await Deno.readFile(blobPath);
+    const index = JSON.parse(await Deno.readTextFile(indexPath));
+    for (const { key, offset, length } of index) {
+      map[key] = new Uint8Array(blob.buffer, blob.byteOffset + offset, length).slice();
+    }
+    usedBlob = true;
+  } catch {
+    // Blob not built yet — fall back to re-encoding from .ttf.br
+  }
+
+  if (!usedBlob) {
+    const { brotliDecompressSync } = await import("node:zlib");
+    const wawoff2 = (await import("npm:wawoff2")).default;
+    const fontsDirs = [
+      `${root}crates/excalidraw-image-fonts-core/fonts`,
+      `${root}crates/excalidraw-image-fonts-cjk/fonts`,
+      `${root}crates/excalidraw-image-fonts-cjk-extra/fonts`,
+    ];
+    async function* walkTtfBr(dir) {
+      for await (const entry of Deno.readDir(dir)) {
+        const full = `${dir}/${entry.name}`;
+        if (entry.isDirectory) {
+          yield* walkTtfBr(full);
+        } else if (entry.isFile && entry.name.toLowerCase().endsWith(".ttf.br")) {
+          yield full;
+        }
+      }
+    }
+    for (const fontsDir of fontsDirs) {
+      try {
+        for await (const full of walkTtfBr(fontsDir)) {
+          const rel = full.slice(fontsDir.length + 1);
+          const key = rel.replace(/\.ttf\.br$/, ".woff2");
+          const compressed = await Deno.readFile(full);
+          const ttf = brotliDecompressSync(compressed);
+          map[key] = new Uint8Array(await wawoff2.compress(ttf)).slice();
+        }
+      } catch {
+        // Font dir may not exist if sync-fonts hasn't been run
       }
     }
   }
-  for await (const full of walkWoff2(fontsRoot)) {
-    const rel = full.slice(fontsRoot.length + 1);
-    map[rel] = await Deno.readFile(full);
-  }
+
   globalThis.__embeddedFonts = map;
 }
 

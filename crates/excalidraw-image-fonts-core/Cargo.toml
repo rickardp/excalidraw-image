@@ -5,7 +5,7 @@ name = "excalidraw-image-fonts-core"
 # the woff2 contents will ever change. Patch is auto-bumped by
 # `npm run sync-fonts -- --bump` whenever the recorded fingerprint
 # drifts from the populated `fonts/` dir.
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 license = "MIT"
 description = "Bundled Latin-script fonts for excalidraw-image"
@@ -16,7 +16,7 @@ rust-version = "1.75"
 include = [
     "src/**/*.rs",
     "build.rs",
-    "fonts/**/*.woff2",
+    "fonts/**/*.ttf.br",
     "Cargo.toml",
     "README.md",
     "LICENSE",
@@ -26,7 +26,7 @@ include = [
 # SHA-256 of (sorted relative path + ":" + sha256-hex of contents) lines, joined by "\n".
 # Verified by `npm run check:fonts`. Update this manually when fonts change,
 # alongside a version bump.
-sha256 = "7375a2660e84bd94f720b62ec8b2364bdf0646955013bb91bb100937416a8965"
+sha256 = "dcd22a0f0c7bdbd5f93dddbacb9aa1c82bd88f512bc6ee242ddd79b73ec4958d"
 file_count = 25
 
 [lib]

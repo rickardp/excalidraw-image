@@ -1,9 +1,9 @@
 //! Bundled CJK font assets (Xiaolai shards) for `excalidraw-image`. See
 //! README.md for the contents list.
 //!
-//! Bytes are raw WOFF2; the consumer (`excalidraw-image`) decompresses to TTF
-//! at its own build time via `woofwoof` for the fontdb, and ships the WOFF2
-//! bytes themselves through the JS engine for Excalidraw's own subset path.
+//! Bytes are brotli-compressed TTF. The consumer (`excalidraw-image`)
+//! decompresses at build time for the fontdb (resvg) and at runtime for the
+//! JS engine (Excalidraw's own font subsetting path).
 //!
 //! This crate is not intended to be used standalone.
 

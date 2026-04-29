@@ -172,7 +172,8 @@ Key implementation choices:
   on every fixture.
 - Native PNG output is produced by Rust `resvg` from the SVG that Excalidraw
   exported.
-- Fonts are bundled as WOFF2-derived Rust font packs. Cargo users can pick
+- Fonts are bundled as brotli-compressed TTF in Rust font packs, with a
+  pre-generated WOFF2 blob for the JS subsetter. Cargo users can pick
   Latin-only, `cjk`, or `cjk-full`; prebuilt binaries ship `cjk-full`.
 
 Approximate binary makeup on macOS arm64:
@@ -182,7 +183,7 @@ Approximate binary makeup on macOS arm64:
 | `deno_core` + `rusty_v8` | V8 runtime dominates the base binary. |
 | JS bundle | Excalidraw export path, shims, font metadata. |
 | Font packs | Latin + optional Xiaolai CJK shards. |
-| PNG stack | `resvg`, `usvg`, `tiny-skia`, `fontdb`, WOFF2 decode support. |
+| PNG stack | `resvg`, `usvg`, `tiny-skia`, `fontdb`. |
 
 ![SVG export sequence diagram](docs/export-flow.excalidraw.svg)
 
@@ -203,9 +204,9 @@ cargo build --release -p excalidraw-image
 The release binary lands at `target/release/excalidraw-image`. Cold start
 is around 220 ms median on `tests/fixtures/basic-shapes.excalidraw`.
 
-Requirements: Rust 1.75+, Node 20+, Deno (for the dev parity gate). PNG
-support pulls in a C++ build-time dependency for WOFF2 decoding
-(`woofwoof`) because the embedded PNG font database needs decoded TTF data.
+Requirements: Rust 1.75+, Node 20+, Deno (for the dev parity gate). The
+build is pure Rust with no C/C++ dependencies beyond what `rusty_v8`
+brings in.
 
 ## Testing
 
@@ -248,7 +249,7 @@ Required secret: `CARGO_REGISTRY_TOKEN`. Everything else uses the
 built-in `GITHUB_TOKEN`. macOS notarization is **not** wired in v1 —
 first-run users hit Gatekeeper; document
 `xattr -d com.apple.quarantine target/release/excalidraw-image` if it
-matters. Linux ARM64 is deferred (woofwoof C++ dep + cross-compile).
+matters. Linux ARM64 is planned for a future release.
 
 ## License
 
