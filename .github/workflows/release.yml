@@ -29,8 +29,6 @@
 #   * Apple notarization — deferred. Users hit Gatekeeper on first run;
 #     README documents `xattr -d com.apple.quarantine`. Re-add when certs
 #     are configured.
-#   * Linux ARM64 — deferred. The woofwoof transitive C++ build dep
-#     complicates cross-compile via the `cross` crate's Docker images.
 
 name: Release
 
@@ -186,9 +184,10 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
           # macos-latest is arm64. Native build for arm64; cross-build for
-          # x86_64 via the rustup target. Apple's clang handles the C++
-          # toolchain (woofwoof's brotli/woff2 dep) for both archs.
+          # x86_64 via the rustup target.
           - os: macos-latest
             target: aarch64-apple-darwin
           - os: macos-latest
@@ -281,6 +280,7 @@ jobs:
             echo "darwin_arm=$(read_sha aarch64-apple-darwin)"
             echo "darwin_x86=$(read_sha x86_64-apple-darwin)"
             echo "linux_x86=$(read_sha x86_64-unknown-linux-gnu)"
+            echo "linux_arm=$(read_sha aarch64-unknown-linux-gnu)"
           } >> "$GITHUB_OUTPUT"
       - name: Render formula
         shell: bash
@@ -297,6 +297,8 @@ jobs:
             -e "s|@@SHA_DARWIN_X86@@|${{ steps.shas.outputs.darwin_x86 }}|g" \
             -e "s|@@URL_LINUX_X86@@|${BASE_URL}/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz|g" \
             -e "s|@@SHA_LINUX_X86@@|${{ steps.shas.outputs.linux_x86 }}|g" \
+            -e "s|@@URL_LINUX_ARM@@|${BASE_URL}/excalidraw-image-aarch64-unknown-linux-gnu.tar.gz|g" \
+            -e "s|@@SHA_LINUX_ARM@@|${{ steps.shas.outputs.linux_arm }}|g" \
             .github/templates/excalidraw-image.rb.tmpl \
             > Formula/excalidraw-image.rb
           echo "Rendered formula:"

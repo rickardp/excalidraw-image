@@ -238,8 +238,9 @@ which:
 2. Creates a draft GitHub Release.
 3. `cargo publish` to crates.io (idempotent on rerun).
 4. Builds CLI binaries for `x86_64-unknown-linux-gnu`,
-   `aarch64-apple-darwin`, `x86_64-apple-darwin`,
-   `x86_64-pc-windows-msvc`. Tarballs uploaded to the release.
+   `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin`,
+   `x86_64-apple-darwin`, `x86_64-pc-windows-msvc`. Tarballs uploaded
+   to the release.
 5. Renders `Formula/excalidraw-image.rb` from the in-repo template and
    commits it back to `main` with `[skip ci]` so the next `brew tap`
    sees the bumped formula.
@@ -249,7 +250,7 @@ Required secret: `CARGO_REGISTRY_TOKEN`. Everything else uses the
 built-in `GITHUB_TOKEN`. macOS notarization is **not** wired in v1 —
 first-run users hit Gatekeeper; document
 `xattr -d com.apple.quarantine target/release/excalidraw-image` if it
-matters. Linux ARM64 is planned for a future release.
+matters.
 
 ## License
 
