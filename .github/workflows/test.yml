@@ -106,6 +106,9 @@ jobs:
       - name: Build dist/core.mjs
         run: make core
 
+      - name: Build WOFF2 blob for JS engine
+        run: node src/scripts/build-woff2-blob.mjs
+
       - name: Run tests (vitest + cargo + parity + audit + deno-test)
         # `make test` already chains: audit, deno-test, vitest, cargo test, parity.
         # On Windows GNU make may not be present; fall back to running the

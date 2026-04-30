@@ -109,6 +109,8 @@ jobs:
         # `cargo publish`. The mirror is gitignored — regenerated on every
         # build so it can't go stale.
         run: make core
+      - name: Build WOFF2 blob for JS engine
+        run: node src/scripts/build-woff2-blob.mjs
       - name: Verify font fingerprints
         # Catches drift: fonts changed but version + recorded fingerprint not
         # bumped. Fails fast before any publish runs.
@@ -217,6 +219,8 @@ jobs:
         run: npm run sync-fonts
       - name: Build dist/core.mjs
         run: make core
+      - name: Build WOFF2 blob for JS engine
+        run: node src/scripts/build-woff2-blob.mjs
       - name: Build binary
         # Ship `cjk-full` in prebuilt binaries so Homebrew/GH-Releases users
         # get every Xiaolai shard (common + long-tail) without having to
