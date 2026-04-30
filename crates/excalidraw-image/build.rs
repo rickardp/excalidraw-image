@@ -63,8 +63,16 @@ fn copy_core_mjs(repo_root: &Path, manifest: &Path, out_dir: &Path) {
         );
     };
 
+    let bytes = fs::read(&src).expect("failed to read core.mjs");
     let dest = out_dir.join("core.mjs");
-    fs::copy(&src, &dest).expect("failed to copy core.mjs into OUT_DIR");
+    fs::write(&dest, &bytes).expect("failed to write core.mjs into OUT_DIR");
+
+    // Cache key for the runtime snapshot cache (engine.rs). CRC32 alone
+    // is fine for a content-addressed local cache: collisions across
+    // bundle revisions are vanishingly unlikely, and the crate version
+    // is also folded into the filename so genuine upgrades invalidate.
+    let crc = crc32fast::hash(&bytes);
+    println!("cargo:rustc-env=EXCALIDRAW_IMAGE_CORE_CRC32={crc:08x}");
 
     println!("cargo:rerun-if-changed={}", src.display());
 }

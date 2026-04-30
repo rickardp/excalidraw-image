@@ -102,6 +102,11 @@ pub struct Args {
     pub max: Option<f64>,
     pub skip_font_inline: bool,
     pub strict_fonts: bool,
+    /// `--no-snapshot-cache` — bypass the per-user V8 startup-snapshot
+    /// cache (see `engine::snapshot_cache`). The same effect is
+    /// available via the `EXCALIDRAW_IMAGE_NO_SNAPSHOT_CACHE=1` env
+    /// var; this flag wins.
+    pub no_snapshot_cache: bool,
 }
 
 impl Default for Args {
@@ -119,6 +124,7 @@ impl Default for Args {
             max: None,
             skip_font_inline: false,
             strict_fonts: false,
+            no_snapshot_cache: false,
         }
     }
 }
@@ -191,6 +197,21 @@ FONTS (ignored when output format is 'excalidraw'):
                               already have the fonts installed locally.
       --strict-fonts          Error on unknown font families instead of
                               falling back to Excalifont.
+
+STARTUP CACHE:
+      --no-snapshot-cache     Skip the per-user V8 startup-snapshot
+                              cache. By default, after the first run on
+                              a machine, subsequent invocations restore
+                              V8 from a snapshot baked into
+                              ~/Library/Caches/excalidraw-image (macOS),
+                              $XDG_CACHE_HOME/excalidraw-image (Linux),
+                              or %LOCALAPPDATA%\\excalidraw-image\\cache
+                              (Windows). The first run pays a small
+                              extra cost to spawn a background warmer.
+                              The cache is content-addressed and self-
+                              prunes on upgrade. Equivalent env vars:
+                                EXCALIDRAW_IMAGE_NO_SNAPSHOT_CACHE=1
+                                EXCALIDRAW_IMAGE_CACHE_DIR=<path>
 
   -h, --help                  Show this help.
   -v, --version               Show version.
@@ -300,6 +321,7 @@ fn parse_inner(args: impl IntoIterator<Item = OsString>) -> Result<Args> {
             }
             Long("skip-font-inline") => out.skip_font_inline = true,
             Long("strict-fonts") => out.strict_fonts = true,
+            Long("no-snapshot-cache") => out.no_snapshot_cache = true,
             Short('h') | Long("help") => {
                 print!("{HELP_TEXT}");
                 std::process::exit(0);

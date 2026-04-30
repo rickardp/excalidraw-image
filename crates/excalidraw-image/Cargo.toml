@@ -88,6 +88,8 @@ excalidraw-image-fonts-cjk-extra = { version = "1.0.0", path = "../excalidraw-im
 brotli = "7"
 # Parse the pre-generated WOFF2 blob index (JSON from build-woff2-blob.mjs).
 serde_json = "1"
+# Cache-key fingerprint of the embedded core.mjs (see engine.rs snapshot cache).
+crc32fast = "1"
 # Sub-crates are also build-deps so build.rs can read FONTS arrays directly.
 excalidraw-image-fonts-core = { version = "1.0.0", path = "../excalidraw-image-fonts-core" }
 excalidraw-image-fonts-cjk = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk", optional = true }

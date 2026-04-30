@@ -21,7 +21,9 @@
 //   * v8 Value → Rust via the `deno_core::scope!` macro + `serde_v8`
 //     (re-exported from `deno_core` in 0.399; no separate crate needed).
 
-use deno_core::{serde_v8, v8, JsRuntime, PollEventLoopOptions, RuntimeOptions};
+use deno_core::{
+    serde_v8, v8, JsRuntime, JsRuntimeForSnapshot, PollEventLoopOptions, RuntimeOptions,
+};
 use serde::Deserialize;
 
 /// Result shape returned by `globalThis.__render(...)`. The JS side also
@@ -386,10 +388,9 @@ fn install_embedded_fonts(rt: &mut JsRuntime) {
         let woff2_bytes = &EMBEDDED_FONTS_JS_BLOB[start..start + len];
         let backing = v8::ArrayBuffer::new_backing_store_from_vec(woff2_bytes.to_vec());
         let buf = v8::ArrayBuffer::with_backing_store(scope, &backing.make_shared());
-        let arr = v8::Uint8Array::new(scope, buf, 0, len)
-            .expect("Uint8Array::new returned None");
-        let key = v8::String::new(scope, path)
-            .expect("v8::String::new returned None for font path");
+        let arr = v8::Uint8Array::new(scope, buf, 0, len).expect("Uint8Array::new returned None");
+        let key =
+            v8::String::new(scope, path).expect("v8::String::new returned None for font path");
         obj.set(scope, key.into(), arr.into());
     }
     let key = v8::String::new(scope, "__embeddedFonts")
@@ -417,6 +418,59 @@ impl Engine {
         Self { rt }
     }
 
+    /// Create an engine by deserializing a pre-built V8 startup snapshot
+    /// produced by [`create_snapshot`]. Skips the bootstrap eval and the
+    /// core.mjs eval (already baked into the snapshot heap) — only the
+    /// runtime-only `__embeddedFonts` global is installed here, since
+    /// font bytes are deliberately NOT in the snapshot (they're read
+    /// only at render time).
+    ///
+    /// Internal: callers go through [`new_cached`](Self::new_cached);
+    /// the V8 startup-mode constraint means this must not be combined
+    /// with [`create_snapshot`] in the same process.
+    fn from_snapshot(snapshot: &'static [u8]) -> Self {
+        let mut rt = JsRuntime::new(RuntimeOptions {
+            startup_snapshot: Some(snapshot),
+            ..Default::default()
+        });
+        install_embedded_fonts(&mut rt);
+        Self { rt }
+    }
+
+    /// Best-effort fast path for cold engine init.
+    ///
+    /// On first run on a given machine: returns [`Engine::new`] (cold
+    /// bootstrap + core.mjs eval, ~80 ms on a modern Mac) and spawns
+    /// the current binary in the background to bake a startup snapshot
+    /// into the user's cache dir (see [`snapshot_cache::cache_path`]).
+    /// Subsequent runs find that file and use [`Engine::from_snapshot`]
+    /// instead, dropping init to ~6 ms.
+    ///
+    /// The cache file is keyed on a CRC32 of the embedded `core.mjs`
+    /// plus the crate version, so upgrading the binary invalidates
+    /// stale snapshots automatically. The background warmer also
+    /// prunes any other `core-*.snap` files in the cache dir so old
+    /// versions don't accumulate.
+    ///
+    /// Disable with `EXCALIDRAW_IMAGE_NO_SNAPSHOT_CACHE=1`. Override
+    /// the cache directory with `EXCALIDRAW_IMAGE_CACHE_DIR=<path>`.
+    pub fn new_cached() -> Self {
+        if snapshot_cache::is_disabled() {
+            return Self::new();
+        }
+
+        if let Some(bytes) = snapshot_cache::load() {
+            // SAFETY: `RuntimeOptions::startup_snapshot` requires `'static`.
+            // We deliberately leak — there's exactly one snapshot per process
+            // and the bytes are reclaimed at process exit.
+            let leaked: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+            return Self::from_snapshot(leaked);
+        }
+
+        snapshot_cache::warm_in_background();
+        Self::new()
+    }
+
     /// Render a scene to SVG.
     ///
     /// * `scene` — the full `.excalidraw` JSON as a string. Passed to the
@@ -425,11 +479,7 @@ impl Engine {
     /// * `opts_json` — a JSON string produced by `argv::Args::opts_json()`.
     ///   Must be a valid JSON object literal (e.g. `{"background":true}`);
     ///   `render()` parses it inside the trampoline.
-    pub async fn render(
-        &mut self,
-        scene: &str,
-        opts_json: &str,
-    ) -> anyhow::Result<RenderResult> {
+    pub async fn render(&mut self, scene: &str, opts_json: &str) -> anyhow::Result<RenderResult> {
         // Stash inputs as globals. Scene is JSON-encoded to survive embedding
         // in a JS string literal; opts_json is already valid JSON so we
         // inject it directly as an object literal.
@@ -467,6 +517,206 @@ impl Engine {
 impl Default for Engine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Build a V8 startup snapshot containing `PRE_CORE_BOOTSTRAP` and the
+/// evaluated JS core. Called only from the snapshot-builder child
+/// process (see [`snapshot_cache::warm_in_background`]); the V8
+/// startup-mode constraint means the same process must not have
+/// previously created a non-snapshotting `JsRuntime`.
+///
+/// Fonts are intentionally NOT installed before snapshotting — they're
+/// only read at render time, and embedding their ~10–20 MB of WOFF2
+/// bytes would defeat the purpose. `Engine::from_snapshot` installs
+/// them post-deserialization.
+fn create_snapshot() -> Box<[u8]> {
+    let mut rt = JsRuntimeForSnapshot::new(RuntimeOptions::default());
+    rt.execute_script("bootstrap.js", PRE_CORE_BOOTSTRAP)
+        .expect("pre-core bootstrap failed to evaluate (snapshotting)");
+    let core = prepare_core(CORE_MJS);
+    rt.execute_script("core.mjs", core)
+        .expect("core.mjs failed to load (snapshotting) — did `make core` run cleanly?");
+    rt.snapshot()
+}
+
+/// Runtime snapshot cache. The shipping binary stays small (no
+/// embedded snapshot blob — see commit history for the rejected
+/// approach), and instead each user's machine warms a per-target
+/// snapshot on first run.
+///
+/// Cache key: CRC32 of the embedded `core.mjs` (computed at build
+/// time, exposed via `EXCALIDRAW_IMAGE_CORE_CRC32`) + crate version.
+/// Upgrading the binary picks up a new key automatically; the
+/// background warmer prunes stale `core-*.snap` files when it writes.
+pub mod snapshot_cache {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process::Command;
+
+    /// crc32 of the embedded core.mjs, set by build.rs.
+    const CORE_CRC32: &str = env!("EXCALIDRAW_IMAGE_CORE_CRC32");
+    /// Crate version — folds into the cache filename so upgrades invalidate.
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+    /// Sentinel env var. When set on a child process, it skips all the
+    /// normal CLI plumbing and just builds a snapshot to the path given
+    /// by the var's value, then exits. Read by `main.rs` BEFORE any
+    /// non-snapshotting V8 init happens.
+    pub const BUILD_SENTINEL_ENV: &str = "__EXCALIDRAW_IMAGE_BUILD_SNAPSHOT";
+
+    /// Disable the runtime cache entirely.
+    pub const DISABLE_ENV: &str = "EXCALIDRAW_IMAGE_NO_SNAPSHOT_CACHE";
+
+    /// Override the cache root.
+    pub const CACHE_DIR_ENV: &str = "EXCALIDRAW_IMAGE_CACHE_DIR";
+
+    pub fn is_disabled() -> bool {
+        std::env::var_os(DISABLE_ENV)
+            .map(|v| !v.is_empty() && v != *"0")
+            .unwrap_or(false)
+    }
+
+    /// Resolve the cache directory.
+    ///
+    /// Priority:
+    /// 1. `$EXCALIDRAW_IMAGE_CACHE_DIR`
+    /// 2. macOS:   `$HOME/Library/Caches/excalidraw-image`
+    /// 3. Windows: `%LOCALAPPDATA%\excalidraw-image\cache`
+    /// 4. *nix:    `$XDG_CACHE_HOME/excalidraw-image` or
+    ///    `$HOME/.cache/excalidraw-image`
+    fn cache_dir() -> Option<PathBuf> {
+        if let Some(d) = std::env::var_os(CACHE_DIR_ENV).filter(|v| !v.is_empty()) {
+            return Some(PathBuf::from(d));
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let home = std::env::var_os("HOME")?;
+            Some(PathBuf::from(home).join("Library/Caches/excalidraw-image"))
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let local = std::env::var_os("LOCALAPPDATA")?;
+            Some(PathBuf::from(local).join("excalidraw-image").join("cache"))
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            if let Some(x) = std::env::var_os("XDG_CACHE_HOME").filter(|v| !v.is_empty()) {
+                return Some(PathBuf::from(x).join("excalidraw-image"));
+            }
+            let home = std::env::var_os("HOME")?;
+            Some(PathBuf::from(home).join(".cache").join("excalidraw-image"))
+        }
+    }
+
+    /// Filename of the snapshot for the *current* binary.
+    fn cache_filename() -> String {
+        format!("core-{VERSION}-{CORE_CRC32}.snap")
+    }
+
+    /// Full path to the current snapshot.
+    pub fn cache_path() -> Option<PathBuf> {
+        Some(cache_dir()?.join(cache_filename()))
+    }
+
+    /// Read the cached snapshot if it exists. Failures are silent —
+    /// the caller falls back to the cold path.
+    pub fn load() -> Option<Vec<u8>> {
+        let p = cache_path()?;
+        match fs::read(&p) {
+            Ok(b) if !b.is_empty() => Some(b),
+            _ => None,
+        }
+    }
+
+    /// Spawn a detached child process that builds the snapshot and
+    /// writes it to the cache. Best-effort — if anything fails the
+    /// next invocation just retries.
+    pub fn warm_in_background() {
+        let Some(dest) = cache_path() else { return };
+
+        let exe = match std::env::current_exe() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        // Create the cache dir up-front so the child's atomic-rename
+        // target exists. If we can't create it, abort warming.
+        if let Some(parent) = dest.parent() {
+            if fs::create_dir_all(parent).is_err() {
+                return;
+            }
+        }
+
+        let mut cmd = Command::new(exe);
+        cmd.env(BUILD_SENTINEL_ENV, &dest);
+        // Detach: don't inherit stdio (writing to closed pipes if the
+        // parent exits would otherwise kill the warmer).
+        cmd.stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+
+        // Best-effort spawn; ignore the child handle so we don't wait.
+        let _ = cmd.spawn();
+    }
+
+    /// Build a snapshot in the current process and write it to
+    /// `dest`. Atomic via temp-file + rename. Also prunes any other
+    /// `core-*.snap` files in the same directory.
+    ///
+    /// Called from main.rs when `BUILD_SENTINEL_ENV` is set. MUST be
+    /// invoked before any other V8 init in this process — the sentinel
+    /// path keeps that contract.
+    pub fn build_and_write(dest: &Path) -> std::io::Result<()> {
+        let snapshot = super::create_snapshot();
+
+        let parent = dest
+            .parent()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "no parent"))?;
+        fs::create_dir_all(parent)?;
+
+        let tmp = parent.join(format!(
+            "{}.tmp.{}",
+            dest.file_name()
+                .map(|f| f.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "core.snap".to_string()),
+            std::process::id(),
+        ));
+        fs::write(&tmp, &snapshot)?;
+        // Atomic on POSIX; on Windows, fs::rename replaces an existing
+        // destination since Rust 1.5+ via MoveFileExW(REPLACE_EXISTING).
+        fs::rename(&tmp, dest)?;
+
+        prune_stale(parent, dest);
+        Ok(())
+    }
+
+    /// Remove any `core-*.snap` files in `dir` that don't equal
+    /// `keep`. Keeps the cache from growing unbounded across upgrades.
+    fn prune_stale(dir: &Path, keep: &Path) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        let keep_name = keep.file_name();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if Some(path.file_name().unwrap_or_default()) == keep_name {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            // Match our own naming scheme only; never touch unrelated files.
+            // Accept both the current snapshot prefix and any leftover
+            // .tmp.<pid> files from a prior interrupted write.
+            let is_ours = name.starts_with("core-")
+                && (name.ends_with(".snap")
+                    || (name.contains(".snap.tmp.") && !name.ends_with(".tmp.")));
+            if !is_ours {
+                continue;
+            }
+            let _ = fs::remove_file(&path);
+        }
     }
 }
 

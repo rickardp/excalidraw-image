@@ -41,6 +41,19 @@ use excalidraw_image::raster;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    // Snapshot-builder sentinel: when this env var is set we are running
+    // as a child process spawned by `engine::snapshot_cache::warm_in_background`.
+    // Build the snapshot, write it to the path in the env var, and
+    // exit — DO NOT touch any non-snapshotting V8 path first, V8 forces
+    // each process into one mode for its entire lifetime.
+    if let Some(dest) = std::env::var_os(engine::snapshot_cache::BUILD_SENTINEL_ENV) {
+        let dest = std::path::PathBuf::from(dest);
+        match engine::snapshot_cache::build_and_write(&dest) {
+            Ok(()) => std::process::exit(0),
+            Err(_) => std::process::exit(1),
+        }
+    }
+
     match run().await {
         Ok(()) => {}
         Err(RunError::Argv(e)) => {
@@ -162,7 +175,11 @@ async fn render_svg(
     args: &argv::Args,
     embed_scene: bool,
 ) -> anyhow::Result<String> {
-    let mut engine = engine::Engine::new();
+    let mut engine = if args.no_snapshot_cache {
+        engine::Engine::new()
+    } else {
+        engine::Engine::new_cached()
+    };
     let result = engine
         .render(scene_json, &args.opts_json(embed_scene))
         .await

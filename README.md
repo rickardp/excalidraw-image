@@ -125,10 +125,34 @@ direction. Major option groups:
   `--frame`, `--max` (ignored when output format is `excalidraw`).
 - **Fonts** — `--skip-font-inline`, `--strict-fonts` (ignored when output
   format is `excalidraw`).
+- **Startup cache** — `--no-snapshot-cache` to bypass the per-user V8
+  startup-snapshot cache (see *Startup snapshot cache* below).
 
 Exit codes: `0` success, `1` runtime error (missing input, no embedded
 scene, render failure, …), `2` argv error (unknown flag, conflicting
 flags, …).
+
+### Startup snapshot cache
+
+To keep the binary small and cross-compile clean, the V8 heap snapshot
+is **not** baked into the binary. Instead, on the first invocation on a
+given machine the binary spawns a short-lived background process that
+writes a snapshot to a per-user cache directory. Every subsequent run
+deserializes that snapshot and skips the JS eval, dropping engine init
+from ~80 ms to ~6 ms (roughly 2× faster end-to-end on a small fixture).
+
+- Cache locations:
+  - macOS: `~/Library/Caches/excalidraw-image/`
+  - Linux: `$XDG_CACHE_HOME/excalidraw-image/` (or
+    `~/.cache/excalidraw-image/`)
+  - Windows: `%LOCALAPPDATA%\excalidraw-image\cache\`
+- The cache file is content-addressed
+  (`core-<crate-version>-<crc32>.snap`); upgrading the binary picks up
+  a new key and the warmer prunes any stale `core-*.snap` files in the
+  same directory on its next write.
+- Bypass per-invocation with `--no-snapshot-cache`.
+- Disable globally with `EXCALIDRAW_IMAGE_NO_SNAPSHOT_CACHE=1`.
+- Override the cache directory with `EXCALIDRAW_IMAGE_CACHE_DIR=<path>`.
 
 ## Compatibility & fidelity
 
