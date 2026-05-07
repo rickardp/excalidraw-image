@@ -1,0 +1,37 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://github.com/rickardp/excalidraw-svg-export",
+  "elements": [
+    {
+      "type": "rectangle",
+      "id": "r1",
+      "x": 100,
+      "y": 100,
+      "width": 200,
+      "height": 60,
+      "backgroundColor": "#a5d8ff",
+      "fillStyle": "solid",
+      "roundness": { "type": 3 },
+      "seed": 11111,
+      "label": { "text": "My Component\n(description)", "fontSize": 14, "fontFamily": 5 }
+    },
+    {
+      "type": "ellipse",
+      "id": "e1",
+      "x": 350,
+      "y": 100,
+      "width": 200,
+      "height": 80,
+      "backgroundColor": "#ffd8a8",
+      "fillStyle": "solid",
+      "seed": 22222,
+      "label": { "text": "Ellipse label" }
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {}
+}

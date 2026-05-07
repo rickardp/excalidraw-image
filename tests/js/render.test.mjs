@@ -83,9 +83,11 @@ describe("T-004: fontkit text-metrics provider registration", () => {
   it("calls setCustomTextMetricsProvider with the shared fontkit provider exactly once", async () => {
     const setCustomTextMetricsProvider = vi.fn();
     const exportToSvg = vi.fn(async () => ({ outerHTML: "<svg/>" }));
+    const convertToExcalidrawElements = vi.fn((els) => els);
     vi.doMock("@excalidraw/excalidraw", () => ({
       setCustomTextMetricsProvider,
       exportToSvg,
+      convertToExcalidrawElements,
     }));
 
     // Fresh module graph so the mock is picked up and the cached

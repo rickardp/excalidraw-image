@@ -1,0 +1,34 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://github.com/rickardp/excalidraw-svg-export",
+  "elements": [
+    {
+      "type": "rectangle",
+      "id": "r1",
+      "x": 100,
+      "y": 100,
+      "width": 220,
+      "height": 80,
+      "backgroundColor": "#b2f2bb",
+      "fillStyle": "solid",
+      "roundness": { "type": 3 },
+      "seed": 33333
+    },
+    {
+      "type": "text",
+      "id": "t1",
+      "x": 0,
+      "y": 0,
+      "text": "Bound to r1",
+      "fontSize": 16,
+      "fontFamily": 5,
+      "containerId": "r1"
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  },
+  "files": {}
+}

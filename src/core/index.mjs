@@ -108,15 +108,122 @@ function _collectFirstFamilies(svg) {
 // upstream §3.2's recommended API surface, (b) it short-circuits one layer
 // of indirection, and (c) it guards against upstream refactoring the default
 // provider off of the canvas path in a future version.
-let exportToSvgPromise;
-function loadExportToSvg() {
-  exportToSvgPromise ??= import("@excalidraw/excalidraw").then((mod) => {
+let excalidrawModulePromise;
+function loadExcalidraw() {
+  excalidrawModulePromise ??= import("@excalidraw/excalidraw").then((mod) => {
     if (typeof mod.setCustomTextMetricsProvider === "function") {
       mod.setCustomTextMetricsProvider(getSharedTextMetricsProvider());
     }
-    return mod.exportToSvg;
+    return mod;
   });
-  return exportToSvgPromise;
+  return excalidrawModulePromise;
+}
+
+// Mirrors excalidraw/excalidraw-mcp's `create_view` pre-pass: skeleton
+// elements may carry a `label` shorthand or rely on `convertToExcalidrawElements`
+// to fill in bound-text layout. Running the same helper here means
+// MCP-generated scenes render identically in this exporter.
+//
+// Gated on detection so we do NOT rewrite already-complete scenes (the helper
+// re-measures text widths and would shift goldens for editor-exported input).
+function needsSkeletonNormalization(elements) {
+  if (!Array.isArray(elements) || elements.length === 0) return false;
+  const byId = new Map();
+  for (const el of elements) if (el && el.id) byId.set(el.id, el);
+  for (const el of elements) {
+    if (!el) continue;
+    if (el.label && typeof el.label === "object") return true;
+    if (el.type === "text" && el.containerId) {
+      const host = byId.get(el.containerId);
+      if (!host) continue;
+      const bound = Array.isArray(host.boundElements) ? host.boundElements : [];
+      const linked = bound.some((b) => b && b.id === el.id);
+      if (!linked) return true;
+    }
+  }
+  return false;
+}
+
+function normalizeSkeleton(elements, convertToExcalidrawElements) {
+  if (!needsSkeletonNormalization(elements)) return elements;
+  const byId = new Map();
+  for (const el of elements) if (el && el.id) byId.set(el.id, el);
+  // Promote orphan containerId-bound text into a `label` shorthand on the
+  // host. The helper only applies bound-text layout to elements supplied via
+  // `label`; standalone text-with-containerId is passed through unchanged.
+  const hostLabels = new Map();
+  const droppedTextIds = new Set();
+  for (const el of elements) {
+    if (!el || el.type !== "text" || !el.containerId) continue;
+    const host = byId.get(el.containerId);
+    if (!host) continue;
+    const bound = Array.isArray(host.boundElements) ? host.boundElements : [];
+    if (bound.some((b) => b && b.id === el.id)) continue;
+    if (hostLabels.has(host.id)) continue;
+    const label = { text: el.text };
+    if (el.fontSize !== undefined) label.fontSize = el.fontSize;
+    if (el.fontFamily !== undefined) label.fontFamily = el.fontFamily;
+    if (el.textAlign !== undefined) label.textAlign = el.textAlign;
+    if (el.verticalAlign !== undefined) label.verticalAlign = el.verticalAlign;
+    hostLabels.set(host.id, label);
+    droppedTextIds.add(el.id);
+  }
+  const prepared = [];
+  for (const el of elements) {
+    if (!el) {
+      prepared.push(el);
+      continue;
+    }
+    if (droppedTextIds.has(el.id)) continue;
+    let next = el;
+    const promoted = hostLabels.get(next.id);
+    if (promoted) {
+      next = { ...next, label: promoted };
+    }
+    if (next.label && typeof next.label === "object") {
+      next = {
+        ...next,
+        label: { textAlign: "center", verticalAlign: "middle", ...next.label },
+      };
+    }
+    prepared.push(next);
+  }
+  const converted = convertToExcalidrawElements(prepared, {
+    regenerateIds: false,
+  });
+  // Helper assigns nanoid ids to synthesized bound-text elements; rewrite
+  // them to a deterministic form so SVG output is reproducible.
+  const originalIds = new Set();
+  for (const el of elements) if (el && el.id) originalIds.add(el.id);
+  const idMap = new Map();
+  for (const el of converted) {
+    if (
+      el &&
+      el.type === "text" &&
+      el.containerId &&
+      !originalIds.has(el.id)
+    ) {
+      idMap.set(el.id, `${el.containerId}__label`);
+    }
+  }
+  if (idMap.size === 0) return converted;
+  return converted.map((el) => {
+    if (!el) return el;
+    let next = el;
+    if (idMap.has(next.id)) next = { ...next, id: idMap.get(next.id) };
+    if (Array.isArray(next.boundElements)) {
+      let mutated = false;
+      const remapped = next.boundElements.map((b) => {
+        if (b && idMap.has(b.id)) {
+          mutated = true;
+          return { ...b, id: idMap.get(b.id) };
+        }
+        return b;
+      });
+      if (mutated) next = { ...next, boundElements: remapped };
+    }
+    return next;
+  });
 }
 
 async function render(sceneJsonOrString, opts = {}) {
@@ -125,7 +232,12 @@ async function render(sceneJsonOrString, opts = {}) {
       ? JSON.parse(sceneJsonOrString)
       : sceneJsonOrString;
 
-  const exportToSvg = await loadExportToSvg();
+  const mod = await loadExcalidraw();
+  const exportToSvg = mod.exportToSvg;
+  const elements = normalizeSkeleton(
+    scene.elements,
+    mod.convertToExcalidrawElements,
+  );
 
   const sceneAppState = scene.appState ?? {};
   const appState = {
@@ -140,7 +252,7 @@ async function render(sceneJsonOrString, opts = {}) {
 
   const svgEl = await exportToSvg(
     {
-      elements: scene.elements,
+      elements,
       appState,
       files: scene.files ?? {},
     },
