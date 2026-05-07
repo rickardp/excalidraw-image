@@ -191,26 +191,54 @@ function normalizeSkeleton(elements, convertToExcalidrawElements) {
   const converted = convertToExcalidrawElements(prepared, {
     regenerateIds: false,
   });
-  // Helper assigns nanoid ids to synthesized bound-text elements; rewrite
-  // them to a deterministic form so SVG output is reproducible.
-  const originalIds = new Set();
-  for (const el of elements) if (el && el.id) originalIds.add(el.id);
+  // The helper introduces host-VM-dependent nondeterminism: nanoid ids on
+  // synthesized text labels, Math.random()-based seed/versionNonce on both
+  // synthesized AND host-mutated elements. These differ between deno_core
+  // (Rust embedding) and Deno standalone, breaking the byte-identity parity
+  // gate. Rewrite all volatile fields deterministically.
+  const originalById = new Map();
+  for (const el of elements) if (el && el.id) originalById.set(el.id, el);
   const idMap = new Map();
   for (const el of converted) {
     if (
       el &&
       el.type === "text" &&
       el.containerId &&
-      !originalIds.has(el.id)
+      !originalById.has(el.id)
     ) {
       idMap.set(el.id, `${el.containerId}__label`);
     }
   }
-  if (idMap.size === 0) return converted;
-  return converted.map((el) => {
+  let labelCounter = 0;
+  const out = converted.map((el) => {
     if (!el) return el;
     let next = el;
-    if (idMap.has(next.id)) next = { ...next, id: idMap.get(next.id) };
+    const synthetic = idMap.has(next.id);
+    const original = originalById.get(next.id);
+    if (synthetic) {
+      labelCounter += 1;
+      next = {
+        ...next,
+        id: idMap.get(next.id),
+        seed: 1000 + labelCounter,
+        versionNonce: 1000 + labelCounter,
+        version: 1,
+        updated: 0,
+      };
+    } else if (original) {
+      // Helper may have bumped versionNonce/version/updated on host elements
+      // (e.g. when injecting boundElements) using Math.random / Date.now —
+      // both diverge across host VMs. When the original supplies these
+      // fields we keep them; otherwise pin to deterministic values so the
+      // embed-scene payload is byte-identical across hosts.
+      next = {
+        ...next,
+        seed: original.seed ?? 1,
+        versionNonce: original.versionNonce ?? 1,
+        version: original.version ?? 1,
+        updated: original.updated ?? 0,
+      };
+    }
     if (Array.isArray(next.boundElements)) {
       let mutated = false;
       const remapped = next.boundElements.map((b) => {
@@ -224,6 +252,7 @@ function normalizeSkeleton(elements, convertToExcalidrawElements) {
     }
     return next;
   });
+  return out;
 }
 
 async function render(sceneJsonOrString, opts = {}) {
