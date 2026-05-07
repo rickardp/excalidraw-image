@@ -31,10 +31,12 @@
 // produced by `node src/scripts/build-woff2-blob.mjs` using wawoff2.
 // This guarantees byte-identical WOFF2 on both sides.
 {
-  const here = new URL(".", import.meta.url).pathname;
-  const root = `${here}../../`;
-  const blobPath = `${root}crates/excalidraw-image/assets/embedded_fonts_js.bin`;
-  const indexPath = `${root}crates/excalidraw-image/assets/embedded_fonts_js.json`;
+  // Use URL objects (not stringified pathnames) so Deno.readFile handles
+  // Windows drive paths correctly. `URL.pathname` returns `/D:/...` on
+  // Windows which Deno can't open as a file path.
+  const root = new URL("../../", import.meta.url);
+  const blobPath = new URL("crates/excalidraw-image/assets/embedded_fonts_js.bin", root);
+  const indexPath = new URL("crates/excalidraw-image/assets/embedded_fonts_js.json", root);
 
   const blob = await Deno.readFile(blobPath);
   const index = JSON.parse(await Deno.readTextFile(indexPath));
