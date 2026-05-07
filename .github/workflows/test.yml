@@ -90,12 +90,12 @@ jobs:
             deno-${{ runner.os }}-
 
       - name: npm ci
-        # `--omit=optional` skips platform-specific optional binaries (e.g.
-        # @parcel/watcher's per-OS native modules pulled in transitively
-        # through sass/vitest). They're file-watcher tooling that CI does
-        # not need, and including them makes `npm ci` fail with
-        # EBADPLATFORM under npm 11's stricter optional-dep handling.
-        run: npm ci --omit=optional
+        # Keep optional deps: vitest 4 → vite 8 → rolldown loads its
+        # platform-specific native binding (an optionalDependency) at
+        # runtime, so `--omit=optional` breaks the test step. The
+        # lockfile lists every platform variant; npm filters to the
+        # current host on install.
+        run: npm ci
 
       - name: Sync bundled fonts from node_modules
         # crates/excalidraw-image-fonts-*/fonts/ is gitignored; populate
