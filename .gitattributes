@@ -1,0 +1,11 @@
+# Goldens and fixtures must be byte-identical across platforms; pin LF so
+# Windows checkout doesn't convert to CRLF and break the SVG-bytes comparison
+# in tests/js/svg-goldens.test.mjs and the Rust-vs-Deno parity gate.
+*.golden text eol=lf
+*.excalidraw text eol=lf
+*.svg text eol=lf
+*.json text eol=lf
+*.mjs text eol=lf
+*.mts text eol=lf
+*.ts text eol=lf
+*.rs text eol=lf
