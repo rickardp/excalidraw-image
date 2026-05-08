@@ -14,6 +14,9 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn bin() -> &'static str {
     env!("CARGO_BIN_EXE_excalidraw-image")
@@ -42,10 +45,11 @@ fn tmpdir() -> PathBuf {
 
 fn rand_suffix() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now()
+    let time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
-        .as_nanos() as u64
+        .as_nanos() as u64;
+    time ^ TMP_COUNTER.fetch_add(1, Ordering::Relaxed)
 }
 
 fn run(args: &[&std::ffi::OsStr]) -> (bool, String, String) {
