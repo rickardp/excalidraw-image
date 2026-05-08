@@ -81,76 +81,13 @@ jobs:
           generate_release_notes: true
 
   publish-crate:
-    name: Publish to crates.io
+    name: Publish to crates.io (skipped)
     needs: create-release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-      - uses: denoland/setup-deno@v1
-        with:
-          deno-version: v2.x
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Install JS deps
-        run: npm ci --omit=optional
-      - name: Sync bundled fonts from node_modules
-        # crates/excalidraw-image-fonts-*/fonts/ is gitignored; populate
-        # before publish so the .crate tarballs include the woff2s.
-        run: npm run sync-fonts
-      - name: Build dist/core.mjs (mirrors to crates/excalidraw-image/assets/)
-        # `make core` runs build-core.mjs which writes dist/core.mjs and
-        # mirrors a copy to crates/excalidraw-image/assets/core.mjs for
-        # `cargo publish`. The mirror is gitignored — regenerated on every
-        # build so it can't go stale.
-        run: make core
-      - name: Build WOFF2 blob for JS engine
-        run: node src/scripts/build-woff2-blob.mjs
-      - name: Verify font fingerprints
-        # Catches drift: fonts changed but version + recorded fingerprint not
-        # bumped. Fails fast before any publish runs.
-        run: npm run check:fonts
-      - name: Publish main crate (idempotent)
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        # Idempotent: re-running on the same tag treats "already exists"
-        # as success. Useful for partial-failure reruns.
-        shell: bash
+      - name: Skip crates.io publish
         run: |
-          set +e
-          output=$(cargo publish -p excalidraw-image --allow-dirty --locked 2>&1)
-          rc=$?
-          set -e
-          printf '%s\n' "$output"
-          if [ "$rc" -eq 0 ]; then
-            exit 0
-          fi
-          if printf '%s' "$output" | grep -qE "already (exists|uploaded)"; then
-            echo "::notice::excalidraw-image ${GITHUB_REF_NAME#v} already on crates.io — treating as success"
-            exit 0
-          fi
-          exit "$rc"
-      - name: Append crates.io link to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-          URL="https://crates.io/crates/excalidraw-image/${VERSION}"
-          CURRENT=$(gh release view "$TAG" --json body -q .body)
-          if printf '%s' "$CURRENT" | grep -qF "$URL"; then
-            echo "::notice::crates.io link already present — skipping append"
-            exit 0
-          fi
-          LINK="- crates.io: [\`excalidraw-image\` ${VERSION}](${URL})"
-          gh release edit "$TAG" --notes "$(printf '%s\n\n%s\n' "$CURRENT" "$LINK")"
+          echo "::notice::Skipping crates.io publish for ${GITHUB_REF_NAME}; the current crate package exceeds crates.io's 10 MiB upload limit."
 
   build-binaries:
     name: Build CLI (${{ matrix.target }})
@@ -230,7 +167,14 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${GITHUB_REF_NAME}" dist/*.tar.gz dist/*.zip --clobber
+        run: |
+          shopt -s nullglob
+          assets=(dist/*.tar.gz dist/*.zip)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "::error::No release archives found under dist/"
+            exit 1
+          fi
+          gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
 
   homebrew-bump:
     name: Bump in-repo Homebrew formula
