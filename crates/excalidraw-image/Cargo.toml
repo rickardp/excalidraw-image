@@ -24,6 +24,8 @@ include = [
     "tests/**/*.rs",
     "build.rs",
     "assets/core.mjs",
+    "assets/embedded_fonts_js.bin",
+    "assets/embedded_fonts_js.json",
     "Cargo.toml",
 ]
 
