@@ -28,7 +28,7 @@ bootstrap:
 	# Populate crates/excalidraw-image-fonts-*/fonts/ from node_modules.
 	# Those dirs are gitignored — see src/scripts/sync-fonts.mjs.
 	npm run sync-fonts
-	# Pre-encode WOFF2 blob for the Rust binary's JS engine path.
+	# Pre-encode WOFF2 blob for the Deno dev/parity fast path.
 	node src/scripts/build-woff2-blob.mjs
 	cargo fetch
 	deno cache src/core/dev.mjs
@@ -41,8 +41,7 @@ fonts:
 	@test -f src/scripts/build-font-assets.mjs \
 		&& node src/scripts/build-font-assets.mjs \
 		|| echo "not-yet-implemented (FNT-001)"
-	# Pre-encode the WOFF2 blob for the Rust binary's JS engine path.
-	# Uses wawoff2 (same encoder as Deno/vitest) for parity.
+	# Pre-encode the WOFF2 blob for the Deno dev/parity fast path.
 	node src/scripts/build-woff2-blob.mjs
 
 # The current src/core/dev.mjs stub (from P-003) intentionally exits 2 to

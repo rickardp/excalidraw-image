@@ -24,8 +24,6 @@ include = [
     "tests/**/*.rs",
     "build.rs",
     "assets/core.mjs",
-    "assets/embedded_fonts_js.bin",
-    "assets/embedded_fonts_js.json",
     "Cargo.toml",
 ]
 
@@ -88,10 +86,12 @@ excalidraw-image-fonts-cjk-extra = { version = "1.0.0", path = "../excalidraw-im
 # consumes raw TTF/OTF; the font sub-crates ship brotli-compressed TTF produced
 # by `npm run sync-fonts`. Pure Rust — no C++ toolchain needed.
 brotli = "7"
-# Parse the pre-generated WOFF2 blob index (JSON from build-woff2-blob.mjs).
-serde_json = "1"
 # Cache-key fingerprint of the embedded core.mjs (see engine.rs snapshot cache).
 crc32fast = "1"
+# Encode WOFF2 at build time from the font sub-crates' brotli-compressed TTF
+# bytes. Keeps the main crates.io package small; the font bytes live only in
+# the split font crates.
+ttf2woff2 = { version = "0.11", default-features = false }
 # Sub-crates are also build-deps so build.rs can read FONTS arrays directly.
 excalidraw-image-fonts-core = { version = "1.0.0", path = "../excalidraw-image-fonts-core" }
 excalidraw-image-fonts-cjk = { version = "1.0.0", path = "../excalidraw-image-fonts-cjk", optional = true }

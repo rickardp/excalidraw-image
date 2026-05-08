@@ -13,6 +13,9 @@
 //      `embedded_fonts.bin`) and `pub static EMBEDDED_FONTS: &[(&str, &[u8])]`
 //      whose slice bodies are subranges of the blob (offset/length tuples
 //      via `&BLOB[start..end]`). Loaded via `include!` from `src/raster.rs`.
+//   4. `embedded_fonts_js.{bin,rs}` — WOFF2 bytes re-encoded without glyf/loca
+//      transform from the same font sub-crate sources for Excalidraw's JS
+//      font-subsetting path.
 //
 // Embedding strategy: **Option Y** (offset/length tuples + single .bin via
 // one `include_bytes!`). PNG-001's task spec preferred Option X
@@ -21,7 +24,9 @@
 // zero faces (verified empirically). We must decompress WOFF2 → TTF at
 // build time, which means writing the decompressed bytes to disk anyway.
 // One concatenated .bin file keeps `include_bytes!` to a single call and
-// matches the fallback Option Y described in the PNG-001 prompt.
+// matches the fallback Option Y described in the PNG-001 prompt. WOFF2 for
+// the JS path is generated here too, so the main crate package does not need
+// to ship a second copy of the font assets.
 //
 // If `make core` hasn't run, or if the npm fonts dir is missing, the build
 // fails with a clear message.
@@ -29,6 +34,8 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use ttf2woff2::{encode_no_transform as encode_woff2, BrotliQuality};
 
 fn main() {
     let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
@@ -92,10 +99,13 @@ fn emit_embedded_fonts(out_dir: &Path) {
         panic!("no fonts in excalidraw-image-fonts-core::FONTS — empty sub-crate?");
     }
 
-    // Decompress every brotli-compressed TTF, concatenate into a single blob,
-    // and record (relative-path, offset, length) for each.
+    // Decompress every brotli-compressed TTF, concatenate into a single TTF
+    // blob for resvg/fontdb, and re-encode the same TTF bytes into a WOFF2
+    // blob for Excalidraw's JS subsetter.
     let mut blob: Vec<u8> = Vec::with_capacity(20 * 1024 * 1024);
     let mut entries: Vec<(String, usize, usize)> = Vec::with_capacity(fonts.len());
+    let mut js_blob: Vec<u8> = Vec::with_capacity(14 * 1024 * 1024);
+    let mut js_entries: Vec<(String, usize, usize)> = Vec::with_capacity(fonts.len());
 
     for (path, compressed) in &fonts {
         let mut decoder = brotli::Decompressor::new(*compressed, 4096);
@@ -107,46 +117,33 @@ fn emit_embedded_fonts(out_dir: &Path) {
         let start = blob.len();
         blob.extend_from_slice(&ttf_bytes);
         entries.push((path.to_string(), start, ttf_bytes.len()));
+
+        // Excalidraw's bundled fontkit path rejects ttf2woff2's transformed
+        // glyf/loca output for some shards. No-transform WOFF2 is larger but
+        // still keeps duplicate font bytes out of the published main crate.
+        let woff2_bytes = encode_woff2(&ttf_bytes, BrotliQuality::default())
+            .unwrap_or_else(|e| panic!("WOFF2 encode failed for {path}: {e}"));
+        let js_start = js_blob.len();
+        js_blob.extend_from_slice(&woff2_bytes);
+        js_entries.push((path.to_string(), js_start, woff2_bytes.len()));
     }
 
-    // Write the fontdb (TTF) blob.
-    let bin_path = out_dir.join("embedded_fonts.bin");
-    fs::write(&bin_path, &blob).expect("failed to write embedded_fonts.bin");
-
-    // Copy the pre-generated WOFF2 blob for the JS engine path.
-    // Excalidraw's subsetter calls woff2Dec internally, so __embeddedFonts
-    // must contain WOFF2 bytes. The blob is pre-encoded by
-    // `node src/scripts/build-woff2-blob.mjs` using wawoff2 (the same WASM
-    // encoder that Deno/vitest use), guaranteeing byte-identical parity.
-    let manifest = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let js_blob_src = manifest.join("assets").join("embedded_fonts_js.bin");
-    let js_index_src = manifest.join("assets").join("embedded_fonts_js.json");
-    if !js_blob_src.exists() || !js_index_src.exists() {
-        panic!(
-            "embedded_fonts_js.{{bin,json}} not found in assets/. \
-             Run `node src/scripts/build-woff2-blob.mjs` first."
-        );
-    }
-
-    // Copy the blob into OUT_DIR so include_bytes! can find it.
-    let js_bin_dest = out_dir.join("embedded_fonts_js.bin");
-    fs::copy(&js_blob_src, &js_bin_dest).expect("failed to copy embedded_fonts_js.bin");
-    println!("cargo:rerun-if-changed={}", js_blob_src.display());
-    println!("cargo:rerun-if-changed={}", js_index_src.display());
-
-    // Parse the JSON index and generate the Rust source for the JS WOFF2 path.
-    let js_index_json = fs::read_to_string(&js_index_src)
-        .expect("failed to read embedded_fonts_js.json");
-    let js_entries: Vec<serde_json::Value> = serde_json::from_str(&js_index_json)
-        .expect("failed to parse embedded_fonts_js.json");
+    fs::write(out_dir.join("embedded_fonts.bin"), &blob)
+        .expect("failed to write embedded_fonts.bin");
+    fs::write(out_dir.join("embedded_fonts_js.bin"), &js_blob)
+        .expect("failed to write embedded_fonts_js.bin");
 
     // The generated table holds `(name, offset, length)` so it can live in a
     // `static` on stable Rust — slicing into a `&[u8]` is not yet `const`
     // (rust-lang/rust#143874). `raster::iter_embedded_fonts()` materializes
     // `(&str, &[u8])` pairs at runtime by indexing into the blob.
     let mut body = String::new();
-    body.push_str("// Generated by build.rs from excalidraw-image-fonts-{core,cjk,cjk-extra}. Do not edit.\n");
-    body.push_str("pub static EMBEDDED_FONTS_BLOB: &[u8] = include_bytes!(\"embedded_fonts.bin\");\n");
+    body.push_str(
+        "// Generated by build.rs from excalidraw-image-fonts-{core,cjk,cjk-extra}. Do not edit.\n",
+    );
+    body.push_str(
+        "pub static EMBEDDED_FONTS_BLOB: &[u8] = include_bytes!(\"embedded_fonts.bin\");\n",
+    );
     body.push_str("pub static EMBEDDED_FONT_INDEX: &[(&str, usize, usize)] = &[\n");
     for (rel, start, len) in &entries {
         body.push_str(&format!("    (\"{}\", {}, {}),\n", rel, start, len));
@@ -158,13 +155,12 @@ fn emit_embedded_fonts(out_dir: &Path) {
 
     // Separate generated file for engine.rs (WOFF2 blob + index for the JS path).
     let mut js_body = String::new();
-    js_body.push_str("// Generated by build.rs — WOFF2 pre-encoded by wawoff2 for the JS engine. Do not edit.\n");
-    js_body.push_str("pub static EMBEDDED_FONTS_JS_BLOB: &[u8] = include_bytes!(\"embedded_fonts_js.bin\");\n");
+    js_body.push_str("// Generated by build.rs — WOFF2 encoded from font sub-crates for the JS engine. Do not edit.\n");
+    js_body.push_str(
+        "pub static EMBEDDED_FONTS_JS_BLOB: &[u8] = include_bytes!(\"embedded_fonts_js.bin\");\n",
+    );
     js_body.push_str("pub static EMBEDDED_FONTS_JS_INDEX: &[(&str, usize, usize)] = &[\n");
-    for entry in &js_entries {
-        let key = entry["key"].as_str().expect("missing key in index entry");
-        let offset = entry["offset"].as_u64().expect("missing offset");
-        let length = entry["length"].as_u64().expect("missing length");
+    for (key, offset, length) in &js_entries {
         js_body.push_str(&format!("    (\"{}\", {}, {}),\n", key, offset, length));
     }
     js_body.push_str("];\n");

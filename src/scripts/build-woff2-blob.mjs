@@ -1,4 +1,4 @@
-// Generates the pre-encoded WOFF2 blob + index for the Rust binary's JS engine
+// Generates the pre-encoded WOFF2 blob + index for the Deno dev/parity fast
 // path. Excalidraw's subsetter expects WOFF2 input (it calls woff2Dec
 // internally), so __embeddedFonts must contain WOFF2 bytes.
 //
@@ -9,11 +9,11 @@
 //   crates/excalidraw-image/assets/embedded_fonts_js.bin   — concatenated WOFF2 blob
 //   crates/excalidraw-image/assets/embedded_fonts_js.json  — index: [{key, offset, length}]
 //
-// build.rs reads these at compile time so no WOFF2 re-encoding happens in Rust.
-// Using the same encoder (wawoff2) for both Deno and Rust guarantees parity.
+// The Rust build generates its own WOFF2 blob from the font sub-crates at
+// compile time so these generated assets do not need to ship in the main crate.
 //
 // Run: node src/scripts/build-woff2-blob.mjs
-// Wired into `make fonts` and `make core` (run before `cargo build`).
+// Wired into `make fonts` and CI before the Deno parity gate.
 
 import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
 import { join, relative } from "node:path";

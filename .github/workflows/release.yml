@@ -81,13 +81,59 @@ jobs:
           generate_release_notes: true
 
   publish-crate:
-    name: Publish to crates.io (skipped)
+    name: Publish to crates.io
     needs: create-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Skip crates.io publish
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: publish-crate
+      - name: Install JS deps
+        run: npm ci --omit=optional
+      - name: Sync bundled fonts from node_modules
+        run: npm run sync-fonts
+      - name: Build dist/core.mjs (mirrors to crates/excalidraw-image/assets/)
+        # `make core` runs build-core.mjs which writes dist/core.mjs and
+        # mirrors a copy to crates/excalidraw-image/assets/core.mjs for
+        # `cargo publish`. The mirror is gitignored — regenerated on every
+        # build so it can't go stale.
+        run: make core
+      - name: Publish excalidraw-image
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        # crates.io rejects duplicate versions; treat that as success.
+        # Useful for partial-failure reruns.
+        shell: bash
         run: |
-          echo "::notice::Skipping crates.io publish for ${GITHUB_REF_NAME}; the current crate package exceeds crates.io's 10 MiB upload limit."
+          set +e
+          output=$(cargo publish -p excalidraw-image --allow-dirty --locked 2>&1)
+          rc=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$rc" -eq 0 ]; then
+            exit 0
+          fi
+          if printf '%s' "$output" | grep -qE "already (exists|uploaded)"; then
+            exit 0
+          fi
+          exit "$rc"
+      - name: Add crates.io link to release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release edit "${GITHUB_REF_NAME}" \
+            --notes "$(gh release view "${GITHUB_REF_NAME}" --json body -q .body)
+
+          crates.io: https://crates.io/crates/excalidraw-image/${VERSION}"
 
   build-binaries:
     name: Build CLI (${{ matrix.target }})
@@ -134,8 +180,6 @@ jobs:
         run: npm run sync-fonts
       - name: Build dist/core.mjs
         run: make core
-      - name: Build WOFF2 blob for JS engine
-        run: node src/scripts/build-woff2-blob.mjs
       - name: Build binary
         # Ship `cjk-full` in prebuilt binaries so Homebrew/GH-Releases users
         # get every Xiaolai shard (common + long-tail) without having to

@@ -106,7 +106,7 @@ jobs:
       - name: Build dist/core.mjs
         run: make core
 
-      - name: Build WOFF2 blob for JS engine
+      - name: Build WOFF2 blob for Deno parity fast path
         run: node src/scripts/build-woff2-blob.mjs
 
       - name: Run tests (vitest + cargo + parity + audit + deno-test)
