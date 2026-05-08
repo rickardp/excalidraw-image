@@ -180,6 +180,10 @@ jobs:
         run: npm run sync-fonts
       - name: Build dist/core.mjs
         run: make core
+      - name: Clean cached V8 artifacts
+        # rust-cache can restore stale `v8` target artifacts without the
+        # matching native `librusty_v8.a`, which makes deno_core fail to link.
+        run: cargo clean -p v8
       - name: Build binary
         # Ship `cjk-full` in prebuilt binaries so Homebrew/GH-Releases users
         # get every Xiaolai shard (common + long-tail) without having to
