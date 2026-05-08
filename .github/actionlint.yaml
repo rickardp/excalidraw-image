@@ -1,9 +1,6 @@
-# Tell actionlint that `macos-13` is a valid runner label. GitHub still
-# supports the macos-13 image (used here as the only x86_64 macOS native
-# runner — see release.yml header). Newer actionlint releases dropped it
-# from the built-in label list when GH started showing deprecation
-# warnings, but the runner is still scheduled and produces the right
-# x86_64 binaries.
+# Tell actionlint that `macos-15-intel` is a valid runner label. It is
+# used here as the x86_64 macOS native runner; actionlint may lag GitHub's
+# hosted runner label set.
 self-hosted-runner:
   labels:
-    - macos-13
+    - macos-15-intel
