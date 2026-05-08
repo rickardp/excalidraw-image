@@ -10,13 +10,13 @@
 # Placeholders rendered by the workflow:
 #   0.2.0           the released version (no leading `v`)
 #   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-apple-darwin.tar.gz    full GH Releases URL for aarch64-apple-darwin tarball
-#   07083a3da1f4e4bcd8851fedf0a0ba5a53e64974e82a9276ae539b03860428bb    sha256 of that tarball
+#   387f7ef44a75528e4c6cca9f0af4bba34e017986f34581d983bb2a96afb5d9ba    sha256 of that tarball
 #   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-apple-darwin.tar.gz    full GH Releases URL for x86_64-apple-darwin tarball
-#   e35a5effc8d383697f615eeeb3035a83b60a892158ebd20f19abce193c6243ea    sha256 of that tarball
+#   bef1198f6237123ecc7f63c1fc6a456413e5f6cc91ae4c548dc26d661066fc21    sha256 of that tarball
 #   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz     full GH Releases URL for x86_64-unknown-linux-gnu tarball
-#   e0a8caa49e3e6897458fb9dd7bda91b8294a7f6b71f19c76eefa097c0946ec9b     sha256 of that tarball
+#   6a86f5188b55aef092d9cedda786565bfdb399bb58e57a1bea26335ed8f19ac6     sha256 of that tarball
 #   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-unknown-linux-gnu.tar.gz     full GH Releases URL for aarch64-unknown-linux-gnu tarball
-#   5409d82f74a80a731efbba334f8219b9bab82585d3a303aab1d9530063a304f2     sha256 of that tarball
+#   c6b222e128965568e281af96edfa437393b2ddb4e3ba360ec2b9b583f273143e     sha256 of that tarball
 
 class ExcalidrawImage < Formula
   desc "Convert Excalidraw files to SVG/PNG (self-contained native binary)"
@@ -27,22 +27,22 @@ class ExcalidrawImage < Formula
   on_macos do
     on_arm do
       url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-apple-darwin.tar.gz"
-      sha256 "07083a3da1f4e4bcd8851fedf0a0ba5a53e64974e82a9276ae539b03860428bb"
+      sha256 "387f7ef44a75528e4c6cca9f0af4bba34e017986f34581d983bb2a96afb5d9ba"
     end
     on_intel do
       url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-apple-darwin.tar.gz"
-      sha256 "e35a5effc8d383697f615eeeb3035a83b60a892158ebd20f19abce193c6243ea"
+      sha256 "bef1198f6237123ecc7f63c1fc6a456413e5f6cc91ae4c548dc26d661066fc21"
     end
   end
 
   on_linux do
     on_intel do
       url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "e0a8caa49e3e6897458fb9dd7bda91b8294a7f6b71f19c76eefa097c0946ec9b"
+      sha256 "6a86f5188b55aef092d9cedda786565bfdb399bb58e57a1bea26335ed8f19ac6"
     end
     on_arm do
       url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-unknown-linux-gnu.tar.gz"
-      sha256 "5409d82f74a80a731efbba334f8219b9bab82585d3a303aab1d9530063a304f2"
+      sha256 "c6b222e128965568e281af96edfa437393b2ddb4e3ba360ec2b9b583f273143e"
     end
   end
 
