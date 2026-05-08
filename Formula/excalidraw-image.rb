@@ -8,41 +8,42 @@
 #   brew install excalidraw-image
 #
 # Placeholders rendered by the workflow:
-#   0.1.2           the released version (no leading `v`)
-#   https://github.com/rickardp/excalidraw-image/releases/download/v0.1.2/excalidraw-image-aarch64-apple-darwin.tar.gz    full GH Releases URL for aarch64-apple-darwin tarball
-#   246805fab9cb189f4b0b2b40bd321a81bd3f8a3d51fe26f63bf93b7c94dba75c    sha256 of that tarball
-#   https://github.com/rickardp/excalidraw-image/releases/download/v0.1.2/excalidraw-image-x86_64-apple-darwin.tar.gz    full GH Releases URL for x86_64-apple-darwin tarball
-#   bcb753bd7f2e7946d0cf64f0add02e28ab1cec579e44e62a16cbe52e8f62998a    sha256 of that tarball
-#   https://github.com/rickardp/excalidraw-image/releases/download/v0.1.2/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz     full GH Releases URL for x86_64-unknown-linux-gnu tarball
-#   5681e7108d6245ec3a1eac28d37b51add9bb6fb55f415e5ac7c5bc1755956fd7     sha256 of that tarball
-#
-# Linux ARM64 is not yet shipped; see the release workflow header.
-# Add an `on_arm` block here and a matching matrix entry in release.yml when
-# that lands.
+#   0.2.0           the released version (no leading `v`)
+#   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-apple-darwin.tar.gz    full GH Releases URL for aarch64-apple-darwin tarball
+#   07083a3da1f4e4bcd8851fedf0a0ba5a53e64974e82a9276ae539b03860428bb    sha256 of that tarball
+#   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-apple-darwin.tar.gz    full GH Releases URL for x86_64-apple-darwin tarball
+#   e35a5effc8d383697f615eeeb3035a83b60a892158ebd20f19abce193c6243ea    sha256 of that tarball
+#   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz     full GH Releases URL for x86_64-unknown-linux-gnu tarball
+#   e0a8caa49e3e6897458fb9dd7bda91b8294a7f6b71f19c76eefa097c0946ec9b     sha256 of that tarball
+#   https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-unknown-linux-gnu.tar.gz     full GH Releases URL for aarch64-unknown-linux-gnu tarball
+#   5409d82f74a80a731efbba334f8219b9bab82585d3a303aab1d9530063a304f2     sha256 of that tarball
 
 class ExcalidrawImage < Formula
   desc "Convert Excalidraw files to SVG/PNG (self-contained native binary)"
   homepage "https://github.com/rickardp/excalidraw-image"
-  version "0.1.2"
+  version "0.2.0"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.1.2/excalidraw-image-aarch64-apple-darwin.tar.gz"
-      sha256 "246805fab9cb189f4b0b2b40bd321a81bd3f8a3d51fe26f63bf93b7c94dba75c"
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-apple-darwin.tar.gz"
+      sha256 "07083a3da1f4e4bcd8851fedf0a0ba5a53e64974e82a9276ae539b03860428bb"
     end
     on_intel do
-      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.1.2/excalidraw-image-x86_64-apple-darwin.tar.gz"
-      sha256 "bcb753bd7f2e7946d0cf64f0add02e28ab1cec579e44e62a16cbe52e8f62998a"
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-apple-darwin.tar.gz"
+      sha256 "e35a5effc8d383697f615eeeb3035a83b60a892158ebd20f19abce193c6243ea"
     end
   end
 
   on_linux do
     on_intel do
-      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.1.2/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz"
-      sha256 "5681e7108d6245ec3a1eac28d37b51add9bb6fb55f415e5ac7c5bc1755956fd7"
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "e0a8caa49e3e6897458fb9dd7bda91b8294a7f6b71f19c76eefa097c0946ec9b"
     end
-    # on_arm: deferred — see release.yml notes on Linux ARM64.
+    on_arm do
+      url "https://github.com/rickardp/excalidraw-image/releases/download/v0.2.0/excalidraw-image-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "5409d82f74a80a731efbba334f8219b9bab82585d3a303aab1d9530063a304f2"
+    end
   end
 
   def install
